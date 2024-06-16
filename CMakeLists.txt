@@ -55,9 +55,7 @@ set(MODS
         DeformedWB
         DualBallControl
         DynamicFov
-        LanternFader
         MapScripts
-        Overclock
         Physics
         SpiritTrail
         TASSupport
