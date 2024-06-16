@@ -17,11 +17,10 @@ public:
     DECLARE_BML_VERSION;
 
     void OnLoad() override;
+    void OnUnload() override;
     void OnProcess() override;
 
     void OnExitGame() override;
-    void OnPauseLevel() override;
-    void OnUnpauseLevel() override;
     void OnPreExitLevel() override;
 
     void EnterTravelCam();
@@ -33,9 +32,7 @@ private:
     InputHook *m_InputHook = nullptr;
     float m_DeltaTime = 0.0f;
 
-    bool m_Once = false;
-    bool m_Paused = false;
-
     float m_TravelSpeed = 0.2f;
+    float m_RotateSpeed = 0.2f;
     CKCamera *m_TravelCam = nullptr;
 };
