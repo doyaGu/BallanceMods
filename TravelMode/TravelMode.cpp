@@ -85,13 +85,14 @@ void TravelMode::OnProcess() {
 
         VxVector delta;
         m_InputHook->GetMouseRelativePosition(delta);
+        const float factor = (180.0f / PI) * m_RotateSpeed * m_DeltaTime;
         if (delta.x != 0) {
             vect = VxVector(0, 1, 0);
-            m_TravelCam->Rotate(&vect, (-delta.x / (float)::GetSystemMetrics(SM_CXSCREEN)) * 180.0f / PI * m_RotateSpeed * m_DeltaTime);
+            m_TravelCam->Rotate(&vect, (-delta.x / (float)::GetSystemMetrics(SM_CXSCREEN)) * factor);
         }
         if (delta.y != 0) {
             vect = VxVector(1, 0, 0);
-            m_TravelCam->Rotate(&vect, (-delta.y / (float)::GetSystemMetrics(SM_CYSCREEN)) * 180.0f / PI * m_RotateSpeed * m_DeltaTime, m_TravelCam);
+            m_TravelCam->Rotate(&vect, (-delta.y / (float)::GetSystemMetrics(SM_CYSCREEN)) * factor, m_TravelCam);
         }
     }
 }
