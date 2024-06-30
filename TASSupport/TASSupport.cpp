@@ -387,7 +387,9 @@ void TASSupport::OnPreProcessInput() {
         } else {
             OnStop();
         }
-    } else if (m_Recording) {
+    }
+
+    if (m_Recording) {
         KeyState state = {};
         CKBYTE *stateBuf = m_InputHook->GetKeyboardState();
         state.key_up = stateBuf[m_KeyUp];
@@ -404,6 +406,10 @@ void TASSupport::OnPreProcessInput() {
 }
 
 void TASSupport::OnPreProcessTime() {
+    if (m_Recording) {
+        m_RecordData.emplace_back(m_TimeManager->GetLastDeltaTime());
+    }
+
     if (m_Playing) {
         if (m_CurFrame < m_RecordData.size()) {
             m_TimeManager->SetLastDeltaTime(m_RecordData[m_CurFrame].deltaTime);
@@ -414,8 +420,6 @@ void TASSupport::OnPreProcessTime() {
         } else {
             OnStop();
         }
-    } else if (m_Recording) {
-        m_RecordData.emplace_back(m_TimeManager->GetLastDeltaTime());
     }
 }
 
@@ -479,7 +483,9 @@ void TASSupport::OnStop() {
                 m_BML->SendIngameMessage("TAS playing stopped.");
                 if (m_ExitOnFinish->GetBoolean())
                     m_BML->ExitGame();
-            } else m_BML->SendIngameMessage("TAS recording stopped.");
+            } else {
+                m_BML->SendIngameMessage("TAS recording stopped.");
+            }
             m_Playing = m_Recording = false;
             m_RecordData.clear();
             m_RecordData.shrink_to_fit();
