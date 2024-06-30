@@ -291,14 +291,16 @@ void TASSupport::OnProcess() {
             OnDrawKeys();
             OnDrawInfo();
 
-            if (m_InputHook->IsKeyToggled(m_StopKey->GetKey()))
+            if (m_InputHook->IsKeyPressed(m_StopKey->GetKey()))
                 OnStop();
 
             if (m_CurFrame < (std::size_t) m_SkipRender->GetInteger())
                 m_BML->SkipRenderForNextTick();
 
-            if (m_InputHook->IsKeyToggled(m_ExitKey->GetKey()))
+            if (m_InputHook->IsKeyPressed(m_ExitKey->GetKey())) {
+                OnStop();
                 m_BML->ExitGame();
+            }
         }
     }
 }
