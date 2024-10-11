@@ -485,6 +485,23 @@ public:
     void get_m_world_f_object_AT(IVP_U_Matrix *m_world_f_object_out);
 };
 
+class IVP_Liquid_Surface_Descriptor {
+public:
+    virtual void calc_liquid_surface(IVP_Environment *environment,
+                                     IVP_Core *core,
+                                     IVP_U_Float_Hesse *surface_normal_out,
+                                     IVP_U_Float_Point *abs_speed_of_current_out) = 0;
+
+};
+
+
+class IVP_Liquid_Surface_Descriptor_Simple : public IVP_Liquid_Surface_Descriptor {
+
+public:
+    IVP_U_Float_Hesse surface;
+    IVP_U_Float_Point abs_speed_of_current;
+};
+
 struct PhysicsObject {
     CKBehavior *m_Behavior;
     IVP_Real_Object *m_RealObject;
@@ -616,6 +633,47 @@ public:
 
         return &*it;
     }
+};
+
+class CKPhysicsManager : public CKIpionManager {
+public:
+    IVP_U_Vector<IVP_Real_Object> m_MovableObjects;
+    int field_30;
+    IVP_U_Vector<CK3dEntity> m_Entities;
+    IVP_U_Vector<IVP_Material> m_Materials;
+    IVP_U_Vector<IVP_Liquid_Surface_Descriptor> m_LiquidSurfaces;
+    void *m_PreSimulateCallbacks;
+    void *m_PostSimulateCallbacks;
+    void *m_ContactManager;
+    void *m_CollisionListener;
+    void *m_ObjectListener;
+    int m_CollDetectionIDAttribType;
+    void *m_CollisionFilterExclusivePair;
+    int m_RefCounter[2];
+    int m_Counting;
+    int m_CountPSIs;
+    int m_UniversePSI;
+    int m_ControllersPSI;
+    int m_IntegratorsPSI;
+    int m_HullPSI;
+    int m_ShortMindistsPSI;
+    int m_CriticalMindistsPSI;
+    int field_90;
+    int field_94;
+    int field_98;
+    int field_9C;
+    int field_A0;
+    int field_A4;
+    int field_A8;
+    int field_AC;
+    int field_B0;
+    int field_B4;
+    void *m_CollisionSurfaces;
+    IVP_Environment *m_Environment;
+    int field_C8;
+    float m_DeltaTime;
+    float m_PhysicsDeltaTime;
+    float m_PhysicsTimeFactor;
 };
 
 extern void InitPhysicsMethodPointers();

@@ -2,8 +2,6 @@
 
 #include <string>
 #include <vector>
-#include <memory>
-#include <thread>
 
 #include <BML/BMLAll.h>
 
@@ -11,6 +9,12 @@
 
 MOD_EXPORT IMod *BMLEntry(IBML *bml);
 MOD_EXPORT void BMLExit(IMod *mod);
+
+typedef enum TASState {
+    TAS_IDLE = 0,
+    TAS_PLAYING = 0x1,
+    TAS_RECORDING = 0x2,
+} TASState;
 
 struct KeyState {
     unsigned key_up: 1;
@@ -24,24 +28,36 @@ struct KeyState {
     unsigned key_enter: 1;
 };
 
-struct FrameData {
+class FrameData {
+public:
     FrameData() = default;
+    explicit FrameData(float deltaTime) : m_DeltaTime(deltaTime) {}
 
-    explicit FrameData(float deltaTime) : deltaTime(deltaTime) {
-        keyStates = 0;
+    float GetDeltaTime() const {
+        return m_DeltaTime;
     }
 
-    float deltaTime;
-    union {
-        KeyState keyState;
-        int keyStates;
-    };
+    void SetDeltaTime(float delta) {
+        m_DeltaTime = delta;
+    }
+
+    const KeyState &GetKeyState() const {
+        return m_KeyState;
+    }
+
+    void SetKeyState(const KeyState &state) {
+        m_KeyState = state;
+    }
+
+private:
+    float m_DeltaTime = 0.0f;
+    KeyState m_KeyState = {};
 };
 
-struct DumpData {
-    DumpData() = default;
+struct PhysicsData {
+    PhysicsData() = default;
 
-    explicit DumpData(float deltaTime) : deltaTime(deltaTime) {}
+    explicit PhysicsData(float deltaTime) : deltaTime(deltaTime) {}
 
     float deltaTime = 0.0f;
     VxVector position;
@@ -50,13 +66,58 @@ struct DumpData {
     VxVector angularVelocity;
 };
 
-struct TASInfo {
-    std::string name;
-    std::string path;
+class TASRecord {
+public:
+    TASRecord() = default;
+    TASRecord(std::string name, std::string path) : m_Name(std::move(name)), m_Path(std::move(path)) {}
 
-    bool operator<(const TASInfo &o) const {
-        return name < o.name;
+    bool operator==(const TASRecord &rhs) const { return m_Name == rhs.m_Name; }
+    bool operator!=(const TASRecord &rhs) const { return !(rhs == *this); }
+
+    bool operator<(const TASRecord &o) const { return m_Name < o.m_Name; }
+    bool operator>(const TASRecord &rhs) const { return rhs < *this; }
+    bool operator<=(const TASRecord &rhs) const { return !(rhs < *this); }
+    bool operator>=(const TASRecord &rhs) const { return !(*this < rhs); }
+
+    const std::string &GetName() const { return m_Name; }
+    void SetName(const std::string &name) { m_Name = name; }
+
+    const std::string &GetPath() const { return m_Path; }
+    void SetPath(const std::string &path) { m_Path = path; }
+
+    bool IsLoaded() const { return m_Loaded; }
+    bool Load();
+    bool Save();
+
+    bool IsPlaying() const { return m_FrameIndex < m_FrameData.size(); }
+    bool IsFinished() const { return m_FrameIndex == m_FrameData.size(); }
+
+    std::size_t GetLength() const { return m_FrameData.size(); }
+    std::size_t GetFrameIndex() const { return m_FrameIndex; }
+    FrameData &GetFrameData() { return m_FrameData[m_FrameIndex]; }
+
+    void NextFrame() { ++m_FrameIndex; }
+    void PrevFrame() { --m_FrameIndex; }
+    void ResetFrame() { m_FrameIndex = 0; }
+
+    void NewFrame(const FrameData &frame) {
+        if (!m_FrameData.empty())
+            ++m_FrameIndex;
+        m_FrameData.emplace_back(frame);
     }
+
+    void Clear() {
+        m_Loaded = false;
+        m_FrameIndex = 0;
+        m_FrameData.clear();
+    }
+
+private:
+    std::string m_Name;
+    std::string m_Path;
+    bool m_Loaded = false;
+    std::size_t m_FrameIndex = 0;
+    std::vector<FrameData> m_FrameData;
 };
 
 class TASSupport : public IMod {
@@ -89,22 +150,35 @@ public:
 
     void OnBallOff() override;
 
-    void OnPreProcessInput();
-    void OnPreProcessTime();
-
     void OnStart();
     void OnStop();
     void OnFinish();
+
+    void OnPreProcessInput();
+    void OnPreProcessTime();
 
     void OnDrawMenu();
     void OnDrawKeys();
     void OnDrawInfo();
 
+    bool IsIdle() const { return m_State == 0; }
+    bool IsPlaying() const { return (m_State & TAS_PLAYING) != 0; }
+    bool IsRecording() const { return (m_State & TAS_RECORDING) != 0; }
+
+    void InitHooks();
+    void ShutdownHooks();
+
+    void AcquireKeyBindings();
+    void SetupPhysicsEngine();
+    void SetupNewRecord();
+
+    void RefreshRecords();
     void OpenTASMenu();
     void ExitTASMenu();
 
-    void RefreshRecords();
-    void LoadTAS(const std::string &filename);
+    KeyState GetKeyboardState(const unsigned char *src) const;
+    void SetKeyboardState(unsigned char *dest, const KeyState &state) const;
+    void ResetKeyboardState(unsigned char *dest) const;
 
     CK3dEntity *GetActiveBall() const;
 
@@ -126,18 +200,16 @@ public:
     IProperty *m_Record = nullptr;
     IProperty *m_StopKey = nullptr;
 
-    bool m_ReadyToPlay = false;
-    bool m_Recording = false;
-    bool m_Playing = false;
+    int m_State = TAS_IDLE;
+    int m_CurrentPage = 0;
     bool m_ShowMenu = false;
-    int m_CurPage = 0;
-    std::vector<TASInfo> m_Records;
 
-    std::size_t m_CurFrame = 0;
-    std::vector<FrameData> m_RecordData;
-    std::vector<DumpData> m_DumpData;
+    TASRecord m_NewRecord;
+    TASRecord m_RecordOnStartup;
+    std::vector<TASRecord> m_Records;
+    TASRecord *m_CurrentRecord = nullptr;
+
     std::string m_MapName;
-
     CK2dEntity *m_Level01 = nullptr;
     CKBehavior *m_ExitStart = nullptr;
     CKBehavior *m_ExitMain = nullptr;
@@ -153,7 +225,5 @@ public:
     IProperty *m_ExitKey = nullptr;
     IProperty *m_LoadTAS = nullptr;
     IProperty *m_LoadLevel = nullptr;
-    IProperty *m_EnableDump = nullptr;
-
-    std::unique_ptr<std::thread> m_LoadThread;
+    IProperty* m_Transcript = nullptr;
 };
