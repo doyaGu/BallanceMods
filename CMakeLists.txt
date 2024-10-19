@@ -56,6 +56,7 @@ set(MODS
         DualBallControl
         DynamicFov
         MapScripts
+		NewSpawn
         Physics
         Segment
         SpiritTrail
