@@ -57,6 +57,7 @@ set(MODS
         DynamicFov
         MapScripts
         Physics
+        Segment
         SpiritTrail
         TASSupport
         TravelMode
