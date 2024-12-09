@@ -196,14 +196,11 @@ public:
     CKKEYBOARD m_KeyShift = CKKEY_LSHIFT;
     CKKEYBOARD m_KeySpace = CKKEY_SPACE;
 
-    IProperty *m_Enabled = nullptr;
-    IProperty *m_Record = nullptr;
-    IProperty *m_StopKey = nullptr;
-
     int m_State = TAS_IDLE;
     int m_CurrentPage = 0;
     bool m_ShowMenu = false;
     bool m_Hooked = false;
+    bool m_Legacy = false;
 
     TASRecord m_NewRecord;
     TASRecord m_RecordOnStartup;
@@ -220,11 +217,15 @@ public:
     IProperty *m_ShowInfo = nullptr;
     char m_FrameCountText[100] = {};
 
+    IProperty *m_Enabled = nullptr;
+    IProperty *m_Record = nullptr;
+    IProperty *m_StopKey = nullptr;
     IProperty *m_SkipRender = nullptr;
     IProperty *m_ExitOnDead = nullptr;
     IProperty *m_ExitOnFinish = nullptr;
     IProperty *m_ExitKey = nullptr;
     IProperty *m_LoadTAS = nullptr;
     IProperty *m_LoadLevel = nullptr;
+    IProperty *m_LegacyMode = nullptr;
     IProperty *m_Transcript = nullptr;
 };

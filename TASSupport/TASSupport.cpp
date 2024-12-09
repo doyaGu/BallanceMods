@@ -232,6 +232,11 @@ void TASSupport::OnLoad() {
     m_LoadLevel->SetComment("Automatically load given level on game startup");
     m_LoadLevel->SetDefaultInteger(0);
 
+    m_LegacyMode = GetConfig()->GetProperty("Misc", "LegacyMode");
+    m_LegacyMode->SetComment("Compatibility mode for older TAS records");
+    m_LegacyMode->SetDefaultBoolean(false);
+    m_Legacy = m_LegacyMode->GetBoolean();
+
     m_Transcript = GetConfig()->GetProperty("Misc", "Transcript");
     m_Transcript->SetComment("Transcript TAS record");
     m_Transcript->SetDefaultBoolean(false);
@@ -673,29 +678,31 @@ void TASSupport::InitHooks() {
     if (m_Hooked)
         return;
 
-    void *base = GetModuleBaseAddress("physics_RT.dll");
-    if (!base) {
-        GetLogger()->Error("Failed to get physics_RT.dll base address");
-        return;
-    }
-
-    ivp_rand = ForceReinterpretCast<decltype(ivp_rand)>(base, 0x2FCD0);
-    qh_rand = ForceReinterpretCast<decltype(qh_rand)>(base, 0x52F50);
-
-    if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&ivp_rand),
-                      reinterpret_cast<LPVOID>(IVP_Rand),
-                      reinterpret_cast<LPVOID *>(&ivp_rand_orig)) != MH_OK ||
-        MH_EnableHook(*reinterpret_cast<LPVOID *>(&ivp_rand)) != MH_OK) {
-        GetLogger()->Error("Failed to hook ivp_rand");
-        return;
+    if (!m_Legacy) {
+        void *base = GetModuleBaseAddress("physics_RT.dll");
+        if (!base) {
+            GetLogger()->Error("Failed to get physics_RT.dll base address");
+            return;
         }
 
-    if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&qh_rand),
-                  reinterpret_cast<LPVOID>(QH_Rand),
-                  reinterpret_cast<LPVOID *>(&qh_rand_orig)) != MH_OK ||
-    MH_EnableHook(*reinterpret_cast<LPVOID *>(&qh_rand)) != MH_OK) {
-        GetLogger()->Error("Failed to hook qh_rand");
-        return;
+        ivp_rand = ForceReinterpretCast<decltype(ivp_rand)>(base, 0x2FCD0);
+        qh_rand = ForceReinterpretCast<decltype(qh_rand)>(base, 0x52F50);
+
+        if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&ivp_rand),
+                          reinterpret_cast<LPVOID>(IVP_Rand),
+                          reinterpret_cast<LPVOID *>(&ivp_rand_orig)) != MH_OK ||
+            MH_EnableHook(*reinterpret_cast<LPVOID *>(&ivp_rand)) != MH_OK) {
+            GetLogger()->Error("Failed to hook ivp_rand");
+            return;
+        }
+
+        if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&qh_rand),
+                          reinterpret_cast<LPVOID>(QH_Rand),
+                          reinterpret_cast<LPVOID *>(&qh_rand_orig)) != MH_OK ||
+            MH_EnableHook(*reinterpret_cast<LPVOID *>(&qh_rand)) != MH_OK) {
+            GetLogger()->Error("Failed to hook qh_rand");
+            return;
+        }
     }
 
     void **vtableTimeManager = reinterpret_cast<void **>(*reinterpret_cast<void **>(m_TimeManager));
@@ -723,11 +730,13 @@ void TASSupport::ShutdownHooks() {
     if (!m_Hooked)
         return;
 
-    MH_DisableHook(*reinterpret_cast<LPVOID *>(&ivp_rand));
-    MH_RemoveHook(*reinterpret_cast<LPVOID *>(&ivp_rand));
+    if (!m_Legacy) {
+        MH_DisableHook(*reinterpret_cast<LPVOID *>(&ivp_rand));
+        MH_RemoveHook(*reinterpret_cast<LPVOID *>(&ivp_rand));
 
-    MH_DisableHook(*reinterpret_cast<LPVOID *>(&qh_rand));
-    MH_RemoveHook(*reinterpret_cast<LPVOID *>(&qh_rand));
+        MH_DisableHook(*reinterpret_cast<LPVOID *>(&qh_rand));
+        MH_RemoveHook(*reinterpret_cast<LPVOID *>(&qh_rand));
+    }
 
     MH_DisableHook(*reinterpret_cast<void **>(&TimeManagerHook::s_PreProcessFuncTarget));
     MH_RemoveHook(*reinterpret_cast<void **>(&TimeManagerHook::s_PreProcessFuncTarget));
