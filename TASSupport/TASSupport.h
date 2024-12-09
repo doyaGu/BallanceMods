@@ -126,7 +126,7 @@ public:
     const char *GetID() override { return "TASSupport"; }
     const char *GetVersion() override { return BML_VERSION; }
     const char *GetName() override { return "TAS Support"; }
-    const char *GetAuthor() override { return "Gamepiaynmo & Kakuty"; }
+    const char *GetAuthor() override { return "Kakuty & Gamepiaynmo"; }
     const char *GetDescription() override { return "Make TAS possible in Ballance (WIP)."; }
     DECLARE_BML_VERSION;
 
