@@ -421,6 +421,14 @@ void TASSupport::OnExitGame() {
     m_Level01 = nullptr;
 }
 
+void TASSupport::OnPreLoadLevel() { OnStart(); }
+
+void TASSupport::OnPreResetLevel() { OnStop(); }
+
+void TASSupport::OnPreExitLevel() { OnStop(); }
+
+void TASSupport::OnLevelFinish() { OnFinish(); }
+
 void TASSupport::OnBallOff() {
     if (m_Enabled->GetBoolean() && IsPlaying() && m_ExitOnDead->GetBoolean())
         m_BML->ExitGame();

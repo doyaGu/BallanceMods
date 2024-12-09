@@ -142,19 +142,11 @@ public:
 
     void OnPostStartMenu() override;
     void OnExitGame() override;
+    void OnPreLoadLevel() override;
 
-    void OnPreLoadLevel() override {
-        if (m_Legacy)
-            OnStart();
-    }
-    void OnPreResetLevel() override { OnStop(); }
-    void OnPreExitLevel() override { OnStop(); }
-    void OnStartLevel() override {
-        if (!m_Legacy)
-            OnStart();
-    }
-    void OnLevelFinish() override { OnFinish(); }
-
+    void OnPreResetLevel() override;
+    void OnPreExitLevel() override;
+    void OnLevelFinish() override;
     void OnBallOff() override;
 
 #ifndef _DEBUG
