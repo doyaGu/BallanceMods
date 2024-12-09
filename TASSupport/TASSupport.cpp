@@ -33,7 +33,7 @@ static char *UncompressDataFromFile(const char *filename, size_t &size) {
     if (!filename)
         return nullptr;
 
-    FILE * fp = fopen(filename, "rb");
+    FILE *fp = fopen(filename, "rb");
     if (!fp) return nullptr;
 
     fseek(fp, 0, SEEK_END);
@@ -58,7 +58,7 @@ static bool CompressDataToFile(char *data, size_t size, const char *filename) {
     int nsize;
     char *res = CKPackData(data, (int) size, nsize, 9);
 
-    FILE * fp = fopen(filename, "wb");
+    FILE *fp = fopen(filename, "wb");
     if (!fp) return false;
 
     fwrite(&size, sizeof(size_t), 1, fp);
@@ -70,7 +70,7 @@ static bool CompressDataToFile(char *data, size_t size, const char *filename) {
     return true;
 }
 
-typedef CKERROR(CKBaseManager::*PreProcessFunc)();
+typedef CKERROR (CKBaseManager::*PreProcessFunc)();
 
 class TimeManagerHook : public CKTimeManager {
 public:
@@ -669,7 +669,6 @@ void TASSupport::SetupPhysicsEngine() {
         // IVP_Environment
         auto *env = *reinterpret_cast<CKBYTE **>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC0);
 
-        // time_manager->base_time = 0;
         auto &base_time = *reinterpret_cast<double *>(*reinterpret_cast<CKBYTE **>(env + 0x4) + 0x18);
         GetLogger()->Info("time_manager->base_time: %f", base_time);
         base_time = 0;
@@ -690,7 +689,6 @@ void TASSupport::SetupPhysicsEngine() {
 //        GetLogger()->Info("current_time_code: %f", current_time_code);
 //        current_time_code = 0;
 
-        // m_DeltaTime
         auto &deltaTime = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC8);
         deltaTime = m_TimeManager->GetLastDeltaTime();
 
@@ -706,8 +704,8 @@ void TASSupport::SetupNewRecord() {
     char filename[MAX_PATH];
     time_t stamp = time(nullptr);
     tm *curTime = localtime(&stamp);
-    sprintf(filename, "%s_%04d%02d%02d_%02d%02d%02d.tas", m_MapName.c_str(), curTime->tm_year + 1900, curTime->tm_mon + 1,
-            curTime->tm_mday, curTime->tm_hour, curTime->tm_min, curTime->tm_sec);
+    sprintf(filename, "%s_%04d%02d%02d_%02d%02d%02d.tas", m_MapName.c_str(), curTime->tm_year + 1900,
+            curTime->tm_mon + 1, curTime->tm_mday, curTime->tm_hour, curTime->tm_min, curTime->tm_sec);
 
     char filepath[MAX_PATH];
     sprintf(filepath, BML_TAS_PATH "%s", filename);

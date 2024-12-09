@@ -56,7 +56,6 @@ private:
 
 struct PhysicsData {
     PhysicsData() = default;
-
     explicit PhysicsData(float deltaTime) : deltaTime(deltaTime) {}
 
     float deltaTime = 0.0f;
@@ -92,8 +91,8 @@ public:
     bool IsPlaying() const { return m_FrameIndex < m_FrameData.size(); }
     bool IsFinished() const { return m_FrameIndex == m_FrameData.size(); }
 
-    std::size_t GetLength() const { return m_FrameData.size(); }
-    std::size_t GetFrameIndex() const { return m_FrameIndex; }
+    size_t GetLength() const { return m_FrameData.size(); }
+    size_t GetFrameIndex() const { return m_FrameIndex; }
     FrameData &GetFrameData() { return m_FrameData[m_FrameIndex]; }
 
     void NextFrame() { ++m_FrameIndex; }
@@ -227,5 +226,5 @@ public:
     IProperty *m_ExitKey = nullptr;
     IProperty *m_LoadTAS = nullptr;
     IProperty *m_LoadLevel = nullptr;
-    IProperty* m_Transcript = nullptr;
+    IProperty *m_Transcript = nullptr;
 };
