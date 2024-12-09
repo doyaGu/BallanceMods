@@ -14,7 +14,7 @@
 
 constexpr int SEG_MAJOR_VER = 2;
 constexpr int SEG_MINOR_VER = 1;
-constexpr int SEG_PATCH_VER = 1;
+constexpr int SEG_PATCH_VER = 2;
 
 MOD_EXPORT IMod *BMLEntry(IBML *bml);
 MOD_EXPORT void BMLExit(IMod *mod);
@@ -41,6 +41,7 @@ public:
     void OnUnpauseLevel() override;
     void OnProcess() override;
     void OnStartLevel() override;
+    void OnPreResetLevel() override;
     void OnPostCheckpointReached() override;
     void OnLoadObject(const char *filename, CKBOOL isMap, const char *masterName, CK_CLASSID filterClass,
                               CKBOOL addtoscene, CKBOOL reuseMeshes, CKBOOL reuseMaterials, CKBOOL dynamic,

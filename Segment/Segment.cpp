@@ -67,6 +67,9 @@ void Segment::OnLoadObject(const char *filename, CKBOOL isMap, const char *maste
 }
 
 void Segment::OnPreExitLevel() {
+    session_->gui.set_cursor_visible(false);
+    session_->state.enable_counting(false);
+    session_->state.update_target_figures();
     save_pico_to_file(serialize_sessions_to_pico());
 }
 
@@ -80,6 +83,7 @@ void Segment::OnPreEndLevel() {
     session_->state.enable_counting(false);
     session_->state.change_segment(get_current_sector() + 1);
     session_->state.update_target_figures();
+    save_pico_to_file(serialize_sessions_to_pico());
 }
 
 void Segment::OnCounterActive() {
@@ -110,6 +114,13 @@ void Segment::OnProcess() {
 void Segment::OnStartLevel() {
     session_->state.reset();
     session_->gui.set_cursor_visible(true);
+}
+
+void Segment::OnPreResetLevel() {
+    session_->gui.set_cursor_visible(false);
+    session_->state.enable_counting(false);
+    session_->state.update_target_figures();
+    save_pico_to_file(serialize_sessions_to_pico());
 }
 
 void Segment::OnPostCheckpointReached() {
