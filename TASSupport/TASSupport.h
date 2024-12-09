@@ -143,9 +143,16 @@ public:
     void OnPostStartMenu() override;
     void OnExitGame() override;
 
-    void OnPreLoadLevel() override { OnStart(); }
+    void OnPreLoadLevel() override {
+        if (m_Legacy)
+            OnStart();
+    }
     void OnPreResetLevel() override { OnStop(); }
     void OnPreExitLevel() override { OnStop(); }
+    void OnStartLevel() override {
+        if (!m_Legacy)
+            OnStart();
+    }
     void OnLevelFinish() override { OnFinish(); }
 
     void OnBallOff() override;
@@ -169,7 +176,8 @@ public:
     void ShutdownHooks();
 
     void AcquireKeyBindings();
-    void SetupPhysicsEngine();
+    void ResetPhysicsTime();
+    void SetPhysicsTimeFactor(float factor = 1.0f);
     void SetupNewRecord();
 
     void RefreshRecords();

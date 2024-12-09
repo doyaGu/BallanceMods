@@ -233,7 +233,7 @@ void TASSupport::OnLoad() {
     m_LoadLevel->SetDefaultInteger(0);
 
     m_LegacyMode = GetConfig()->GetProperty("Misc", "LegacyMode");
-    m_LegacyMode->SetComment("Compatibility mode for older TAS records");
+    m_LegacyMode->SetComment("Compatibility mode for older TAS records (Restart game to take effect)");
     m_LegacyMode->SetDefaultBoolean(false);
     m_Legacy = m_LegacyMode->GetBoolean();
 
@@ -435,7 +435,7 @@ void TASSupport::OnStart() {
         return;
 
     m_BML->AddTimer(1ul, [this]() {
-        SetupPhysicsEngine();
+        ResetPhysicsTime();
     });
 
     AcquireKeyBindings();
@@ -478,6 +478,8 @@ void TASSupport::OnStop() {
             m_BML->ExitGame();
         }
     }
+
+    SetPhysicsTimeFactor();
 
     m_State = TAS_IDLE;
 }
@@ -756,7 +758,8 @@ void TASSupport::AcquireKeyBindings() {
     }
 }
 
-void TASSupport::SetupPhysicsEngine() {
+void TASSupport::ResetPhysicsTime() {
+    // Reset physics time in order to sync with TAS records
     if (m_PhysicsRTVersion == 0x000001) {
         // IVP_Environment
         auto *env = *reinterpret_cast<CKBYTE **>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC0);
@@ -783,12 +786,19 @@ void TASSupport::SetupPhysicsEngine() {
 
         auto &deltaTime = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC8);
         deltaTime = m_TimeManager->GetLastDeltaTime();
-
-        auto &physicsTimeFactor = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xD0);
-        physicsTimeFactor = 0.001f;
     } else if (m_PhysicsRTVersion == 0x000002) {
         m_IpionManager->ResetSimulationClock();
         m_IpionManager->SetDeltaTime(m_TimeManager->GetLastDeltaTime());
+    }
+}
+
+void TASSupport::SetPhysicsTimeFactor(float factor) {
+    // Reset physics time factor in case it was changed
+    if (m_PhysicsRTVersion == 0x000001) {
+        auto &physicsTimeFactor = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xD0);
+        physicsTimeFactor = factor * 0.001f;
+    } else {
+        m_IpionManager->SetTimeFactor(1);
     }
 }
 
