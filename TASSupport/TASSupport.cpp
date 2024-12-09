@@ -677,6 +677,9 @@ void TASSupport::SetupPhysicsEngine() {
         // m_DeltaTime
         auto &deltaTime = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC8);
         deltaTime = m_TimeManager->GetLastDeltaTime();
+
+        auto &physicsTimeFactor = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xD0);
+        physicsTimeFactor = 0.001f;
     } else if (m_PhysicsRTVersion == 0x000002) {
         m_IpionManager->ResetSimulationClock();
         m_IpionManager->SetDeltaTime(m_TimeManager->GetLastDeltaTime());
