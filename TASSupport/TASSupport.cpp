@@ -195,6 +195,10 @@ void TASSupport::OnLoad() {
     m_TimeManager = m_BML->GetTimeManager();
     m_InputHook = m_BML->GetInputManager();
 
+    if (MH_Initialize() != MH_OK) {
+        GetLogger()->Error("Failed to initialize MinHook");
+    }
+
     if (m_Enabled->GetBoolean()) {
         InitHooks();
     }
@@ -203,6 +207,18 @@ void TASSupport::OnLoad() {
 void TASSupport::OnUnload() {
     if (m_Enabled->GetBoolean()) {
         ShutdownHooks();
+    }
+
+    MH_Uninitialize();
+}
+
+void TASSupport::OnModifyConfig(const char *category, const char *key, IProperty *prop) {
+    if (prop == m_Enabled) {
+        if (m_Enabled->GetBoolean()) {
+            InitHooks();
+        } else {
+            ShutdownHooks();
+        }
     }
 }
 
@@ -602,7 +618,7 @@ void TASSupport::OnDrawInfo() {
 }
 
 void TASSupport::InitHooks() {
-    if (MH_Initialize() != MH_OK)
+    if (m_Hooked)
         return;
 
     void **vtableTimeManager = reinterpret_cast<void **>(*reinterpret_cast<void **>(m_TimeManager));
@@ -611,7 +627,7 @@ void TASSupport::InitHooks() {
                       *reinterpret_cast<LPVOID *>(&TimeManagerHook::s_PreProcessFunc),
                       reinterpret_cast<LPVOID *>(&TimeManagerHook::s_PreProcessFuncOrig)) != MH_OK ||
         MH_EnableHook(*reinterpret_cast<LPVOID *>(&TimeManagerHook::s_PreProcessFuncTarget)) != MH_OK) {
-        GetLogger()->Error("Create Time Manager Hook Failed");
+        GetLogger()->Error("Failed to hook Time Manager");
         return;
     }
 
@@ -622,19 +638,19 @@ void TASSupport::InitHooks() {
                       *reinterpret_cast<LPVOID *>(&InputManagerHook::s_PreProcessFunc),
                       reinterpret_cast<LPVOID *>(&InputManagerHook::s_PreProcessFuncOrig)) != MH_OK ||
         MH_EnableHook(*reinterpret_cast<LPVOID *>(&InputManagerHook::s_PreProcessFuncTarget)) != MH_OK) {
-        GetLogger()->Error("Create Input Manager Hook Failed");
-        return;
+        GetLogger()->Error("Failed to hook Input Manager");
     }
 }
 
 void TASSupport::ShutdownHooks() {
+    if (!m_Hooked)
+        return;
+
     MH_DisableHook(*reinterpret_cast<void **>(&TimeManagerHook::s_PreProcessFuncTarget));
     MH_RemoveHook(*reinterpret_cast<void **>(&TimeManagerHook::s_PreProcessFuncTarget));
 
     MH_DisableHook(*reinterpret_cast<void **>(&InputManagerHook::s_PreProcessFuncTarget));
     MH_RemoveHook(*reinterpret_cast<void **>(&InputManagerHook::s_PreProcessFuncTarget));
-
-    MH_Uninitialize();
 }
 
 void TASSupport::AcquireKeyBindings() {

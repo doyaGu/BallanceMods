@@ -133,6 +133,7 @@ public:
 
     void OnLoad() override;
     void OnUnload() override;
+    void OnModifyConfig(const char *category, const char *key, IProperty *prop) override;
     void OnLoadObject(const char *filename, CKBOOL isMap, const char *masterName, CK_CLASSID filterClass,
                       CKBOOL addToScene, CKBOOL reuseMeshes, CKBOOL reuseMaterials, CKBOOL dynamic,
                       XObjectArray *objArray, CKObject *masterObj) override;
@@ -203,6 +204,7 @@ public:
     int m_State = TAS_IDLE;
     int m_CurrentPage = 0;
     bool m_ShowMenu = false;
+    bool m_Hooked = false;
 
     TASRecord m_NewRecord;
     TASRecord m_RecordOnStartup;
