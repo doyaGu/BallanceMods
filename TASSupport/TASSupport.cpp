@@ -5,11 +5,20 @@
 #include <thread>
 #include <sys/stat.h>
 
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <Windows.h>
+#include <Psapi.h>
+
 #include <MinHook.h>
+#include <random>
 
 #include <BML/Bui.h>
 
 #define BML_TAS_PATH "..\\ModLoader\\TASRecords\\"
+
+constexpr int RAND_SEED = 12345;
 
 TASSupport *g_Mod = nullptr;
 
@@ -20,6 +29,34 @@ IMod *BMLEntry(IBML *bml) {
 
 void BMLExit(IMod *mod) {
     delete mod;
+}
+
+template<typename T>
+T ForceReinterpretCast(void *base, size_t offset) {
+    void *p = static_cast<char *>(base) + offset;
+    return *reinterpret_cast<T *>(&p);
+}
+
+static void *GetModuleBaseAddress(const char *modulePath) {
+    if (!modulePath)
+        return nullptr;
+
+    int size = ::MultiByteToWideChar(CP_UTF8, 0, modulePath, -1, nullptr, 0);
+    if (size == 0)
+        return nullptr;
+
+    auto ws = new wchar_t[size];
+    ::MultiByteToWideChar(CP_UTF8, 0, modulePath, -1, ws, size);
+
+    HMODULE hModule = ::GetModuleHandleW(ws);
+    delete[] ws;
+    if (!hModule)
+        return nullptr;
+
+    MODULEINFO moduleInfo;
+    ::GetModuleInformation(::GetCurrentProcess(), hModule, &moduleInfo, sizeof(moduleInfo));
+
+    return moduleInfo.lpBaseOfDll;
 }
 
 static CKDWORD GetPhysicsRTVersion() {
@@ -68,6 +105,21 @@ static bool CompressDataToFile(char *data, size_t size, const char *filename) {
     CKDeletePointer(res);
 
     return true;
+}
+
+static double (*ivp_rand)() = nullptr;
+static double (*ivp_rand_orig)() = nullptr;
+static int (*qh_rand)() = nullptr;
+static int (*qh_rand_orig)() = nullptr;
+
+double IVP_Rand() {
+    std::mt19937 rng(RAND_SEED);
+    return rng();
+}
+
+int QH_Rand() {
+    std::mt19937 rng(RAND_SEED);
+    return rng();
 }
 
 typedef CKERROR (CKBaseManager::*PreProcessFunc)();
@@ -621,6 +673,31 @@ void TASSupport::InitHooks() {
     if (m_Hooked)
         return;
 
+    void *base = GetModuleBaseAddress("physics_RT.dll");
+    if (!base) {
+        GetLogger()->Error("Failed to get physics_RT.dll base address");
+        return;
+    }
+
+    ivp_rand = ForceReinterpretCast<decltype(ivp_rand)>(base, 0x2FCD0);
+    qh_rand = ForceReinterpretCast<decltype(qh_rand)>(base, 0x52F50);
+
+    if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&ivp_rand),
+                      reinterpret_cast<LPVOID>(IVP_Rand),
+                      reinterpret_cast<LPVOID *>(&ivp_rand_orig)) != MH_OK ||
+        MH_EnableHook(*reinterpret_cast<LPVOID *>(&ivp_rand)) != MH_OK) {
+        GetLogger()->Error("Failed to hook ivp_rand");
+        return;
+        }
+
+    if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&qh_rand),
+                  reinterpret_cast<LPVOID>(QH_Rand),
+                  reinterpret_cast<LPVOID *>(&qh_rand_orig)) != MH_OK ||
+    MH_EnableHook(*reinterpret_cast<LPVOID *>(&qh_rand)) != MH_OK) {
+        GetLogger()->Error("Failed to hook qh_rand");
+        return;
+    }
+
     void **vtableTimeManager = reinterpret_cast<void **>(*reinterpret_cast<void **>(m_TimeManager));
     TimeManagerHook::s_PreProcessFuncTarget = *reinterpret_cast<PreProcessFunc *>(&vtableTimeManager[5]);
     if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&TimeManagerHook::s_PreProcessFuncTarget),
@@ -645,6 +722,12 @@ void TASSupport::InitHooks() {
 void TASSupport::ShutdownHooks() {
     if (!m_Hooked)
         return;
+
+    MH_DisableHook(*reinterpret_cast<LPVOID *>(&ivp_rand));
+    MH_RemoveHook(*reinterpret_cast<LPVOID *>(&ivp_rand));
+
+    MH_DisableHook(*reinterpret_cast<LPVOID *>(&qh_rand));
+    MH_RemoveHook(*reinterpret_cast<LPVOID *>(&qh_rand));
 
     MH_DisableHook(*reinterpret_cast<void **>(&TimeManagerHook::s_PreProcessFuncTarget));
     MH_RemoveHook(*reinterpret_cast<void **>(&TimeManagerHook::s_PreProcessFuncTarget));
@@ -685,9 +768,9 @@ void TASSupport::SetupPhysicsEngine() {
         GetLogger()->Info("time_of_next_psi: %f", time_of_next_psi);
         time_of_next_psi = time_of_last_psi + 1.0 / 66;
 
-//        auto &current_time_code = *reinterpret_cast<double *>(env + 0x138);
-//        GetLogger()->Info("current_time_code: %f", current_time_code);
-//        current_time_code = 0;
+        // auto &current_time_code = *reinterpret_cast<double *>(env + 0x138);
+        // GetLogger()->Info("current_time_code: %f", current_time_code);
+        // current_time_code = 1;
 
         auto &deltaTime = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC8);
         deltaTime = m_TimeManager->GetLastDeltaTime();
