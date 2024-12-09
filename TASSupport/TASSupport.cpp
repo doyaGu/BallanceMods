@@ -237,10 +237,6 @@ void TASSupport::OnLoad() {
     m_LegacyMode->SetDefaultBoolean(false);
     m_Legacy = m_LegacyMode->GetBoolean();
 
-    m_Transcript = GetConfig()->GetProperty("Misc", "Transcript");
-    m_Transcript->SetComment("Transcript TAS record");
-    m_Transcript->SetDefaultBoolean(false);
-
     VxMakeDirectory((CKSTRING) BML_TAS_PATH);
 
     m_PhysicsRTVersion = GetPhysicsRTVersion();
