@@ -520,7 +520,11 @@ void TASSupport::OnStop() {
         }
     }
 
-    SetPhysicsTimeFactor();
+    if (!m_Legacy) {
+        m_BML->AddTimer(1ul, [this]() {
+            SetPhysicsTimeFactor();
+        });
+    }
 
     m_State = TAS_IDLE;
 }
