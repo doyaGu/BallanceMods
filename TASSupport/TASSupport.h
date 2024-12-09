@@ -157,6 +157,14 @@ public:
 
     void OnBallOff() override;
 
+#ifndef _DEBUG
+    void OnPhysicalize(CK3dEntity *target, CKBOOL fixed, float friction, float elasticity, float mass,
+                       const char *collGroup, CKBOOL startFrozen, CKBOOL enableColl, CKBOOL calcMassCenter,
+                       float linearDamp, float rotDamp, const char *collSurface, VxVector massCenter,
+                       int convexCnt, CKMesh **convexMesh, int ballCnt, VxVector *ballCenter, float *ballRadius,
+                       int concaveCnt, CKMesh **concaveMesh) override;
+#endif
+
     void OnStart();
     void OnStop();
     void OnFinish();
