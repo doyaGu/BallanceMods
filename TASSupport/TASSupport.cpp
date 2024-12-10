@@ -800,19 +800,27 @@ void TASSupport::ResetPhysicsTime() {
         auto *env = *reinterpret_cast<CKBYTE **>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC0);
 
         auto &base_time = *reinterpret_cast<double *>(*reinterpret_cast<CKBYTE **>(env + 0x4) + 0x18);
+#ifdef _DEBUG
         GetLogger()->Info("time_manager->base_time: %f", base_time);
+#endif
         base_time = 0;
 
         auto &current_time = *reinterpret_cast<double *>(env + 0x120);
+#ifdef _DEBUG
         GetLogger()->Info("current_time: %f", current_time);
+#endif
         current_time = 0;
 
         auto &time_of_last_psi = *reinterpret_cast<double *>(env + 0x130);
+#ifdef _DEBUG
         GetLogger()->Info("time_of_last_psi: %f", time_of_last_psi);
+#endif
         time_of_last_psi = 0;
 
         auto &time_of_next_psi = *reinterpret_cast<double *>(env + 0x128);
+#ifdef _DEBUG
         GetLogger()->Info("time_of_next_psi: %f", time_of_next_psi);
+#endif
         time_of_next_psi = time_of_last_psi + 1.0 / 66;
 
         // auto &current_time_code = *reinterpret_cast<double *>(env + 0x138);
