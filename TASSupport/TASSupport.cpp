@@ -12,7 +12,6 @@
 #include <Psapi.h>
 
 #include <MinHook.h>
-#include <random>
 
 #include <BML/Bui.h>
 
@@ -105,26 +104,13 @@ static bool CompressDataToFile(char *data, size_t size, const char *filename) {
     return true;
 }
 
-// The first value from the original ivp_rand() is 0.001144
-static double g_IVPMagic = 0.001144;
-// The first value from the original qh_rand() is 16807
-static int g_QhullMagic = 16807;
-
-static int *IVP_RAND_SEED = nullptr;
 static double (*ivp_rand)() = nullptr;
 static double (*ivp_rand_orig)() = nullptr;
-
-static void (*qh_srand)(int seed) = nullptr;
 static int (*qh_rand)() = nullptr;
 static int (*qh_rand_orig)() = nullptr;
 
-double IVP_Rand() {
-    return g_IVPMagic;
-}
-
-int QH_Rand() {
-    return g_QhullMagic;
-}
+double IVP_Rand() { return 1; }
+int QH_Rand() { return 1; }
 
 typedef CKERROR (CKBaseManager::*PreProcessFunc)();
 
@@ -240,16 +226,6 @@ void TASSupport::OnLoad() {
     m_LegacyMode->SetComment("Compatibility mode for older TAS records (Restart game to take effect)");
     m_LegacyMode->SetDefaultBoolean(false);
     m_Legacy = m_LegacyMode->GetBoolean();
-
-    m_IVPMagic = GetConfig()->GetProperty("Advanced", "IVPMagic");
-    m_IVPMagic->SetComment("The magic value for ivp_rand (0.0 ~ 1.0)");
-    m_IVPMagic->SetDefaultFloat(static_cast<float>(g_IVPMagic));
-    g_IVPMagic = m_IVPMagic->GetFloat();
-
-    m_QhullMagic = GetConfig()->GetProperty("Advanced", "QhullMagic");
-    m_QhullMagic->SetComment("The magic value for qh_rand (1 ~ 2^31 -2)");
-    m_QhullMagic->SetDefaultInteger(g_QhullMagic);
-    g_QhullMagic = m_QhullMagic->GetInteger();
 
     VxMakeDirectory((CKSTRING) BML_TAS_PATH);
 
@@ -746,9 +722,6 @@ void TASSupport::InitHooks() {
             return;
         }
 
-        IVP_RAND_SEED = ForceReinterpretCast<decltype(IVP_RAND_SEED)>(base, 0x685B4);
-        qh_srand = ForceReinterpretCast<decltype(qh_srand)>(base, 0x52FB0);
-
         ivp_rand = ForceReinterpretCast<decltype(ivp_rand)>(base, 0x2FCD0);
         qh_rand = ForceReinterpretCast<decltype(qh_rand)>(base, 0x52F50);
 
@@ -859,7 +832,7 @@ void TASSupport::SetPhysicsTimeFactor(float factor) {
     if (m_PhysicsRTVersion == 0x000001) {
         auto &physicsTimeFactor = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xD0);
         physicsTimeFactor = factor * 0.001f;
-    } else {
+    } else if (m_PhysicsRTVersion == 0x000002) {
         m_IpionManager->SetTimeFactor(1);
     }
 }

@@ -235,6 +235,4 @@ public:
     IProperty *m_LoadTAS = nullptr;
     IProperty *m_LoadLevel = nullptr;
     IProperty *m_LegacyMode = nullptr;
-    IProperty *m_IVPMagic = nullptr;
-    IProperty *m_QhullMagic = nullptr;
 };
