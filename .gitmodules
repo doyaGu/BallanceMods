@@ -1,3 +1,6 @@
 [submodule "TASSupport/minhook"]
 	path = TASSupport/minhook
 	url = https://github.com/TsudaKageyu/minhook.git
+[submodule "TASSupport/miniz"]
+	path = TASSupport/miniz
+	url = https://github.com/richgel999/miniz.git
