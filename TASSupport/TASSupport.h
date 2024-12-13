@@ -178,6 +178,7 @@ public:
     void AcquireKeyBindings();
     void ResetPhysicsTime();
     void SetPhysicsTimeFactor(float factor = 1.0f);
+    void SetNextMovementCheck(short count = 0);
     void SetupNewRecord();
 
     void RefreshRecords();

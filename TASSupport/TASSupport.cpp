@@ -104,13 +104,13 @@ static bool CompressDataToFile(char *data, size_t size, const char *filename) {
     return true;
 }
 
-static double (*ivp_rand)() = nullptr;
-static double (*ivp_rand_orig)() = nullptr;
+// qh_RANDOMmax
+static const int QH_RAND_MAX = 2147483646;
+
 static int (*qh_rand)() = nullptr;
 static int (*qh_rand_orig)() = nullptr;
 
-double IVP_Rand() { return 1; }
-int QH_Rand() { return 1; }
+int QH_Rand() { return QH_RAND_MAX; }
 
 typedef CKERROR (CKBaseManager::*PreProcessFunc)();
 
@@ -316,6 +316,10 @@ void TASSupport::OnProcess() {
         if (m_BML->IsCheatEnabled() && IsRecording())
             OnStop();
 #endif
+
+        if (!m_Legacy && (IsRecording() || IsPlaying())) {
+            SetNextMovementCheck();
+        }
 
         if (m_Level01 && m_Level01->IsVisible()) {
             const ImVec2 &vpSize = ImGui::GetMainViewport()->Size;
@@ -722,16 +726,7 @@ void TASSupport::InitHooks() {
             return;
         }
 
-        ivp_rand = ForceReinterpretCast<decltype(ivp_rand)>(base, 0x2FCD0);
         qh_rand = ForceReinterpretCast<decltype(qh_rand)>(base, 0x52F50);
-
-        if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&ivp_rand),
-                          reinterpret_cast<LPVOID>(IVP_Rand),
-                          reinterpret_cast<LPVOID *>(&ivp_rand_orig)) != MH_OK ||
-            MH_EnableHook(*reinterpret_cast<LPVOID *>(&ivp_rand)) != MH_OK) {
-            GetLogger()->Error("Failed to hook ivp_rand");
-            return;
-        }
 
         if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&qh_rand),
                           reinterpret_cast<LPVOID>(QH_Rand),
@@ -768,9 +763,6 @@ void TASSupport::ShutdownHooks() {
         return;
 
     if (!m_Legacy) {
-        MH_DisableHook(*reinterpret_cast<LPVOID *>(&ivp_rand));
-        MH_RemoveHook(*reinterpret_cast<LPVOID *>(&ivp_rand));
-
         MH_DisableHook(*reinterpret_cast<LPVOID *>(&qh_rand));
         MH_RemoveHook(*reinterpret_cast<LPVOID *>(&qh_rand));
     }
@@ -842,6 +834,16 @@ void TASSupport::SetPhysicsTimeFactor(float factor) {
         physicsTimeFactor = factor * 0.001f;
     } else if (m_PhysicsRTVersion == 0x000002) {
         m_IpionManager->SetTimeFactor(1);
+    }
+}
+
+void TASSupport::SetNextMovementCheck(short count) {
+    if (m_PhysicsRTVersion == 0x000001) {
+        auto *env = *reinterpret_cast<CKBYTE**>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC0);
+        if (env) {
+            auto &next_movement_check = *reinterpret_cast<short *>(env + 0x140);
+            next_movement_check = count;
+        }
     }
 }
 
