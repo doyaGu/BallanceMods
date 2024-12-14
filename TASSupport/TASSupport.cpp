@@ -112,7 +112,18 @@ static int (*qh_rand_orig)() = nullptr;
 
 int QH_Rand() { return QH_RAND_MAX; }
 
-typedef CKERROR (CKBaseManager::*PreProcessFunc)();
+static int (IVP_Environment::*must_perform_movement_check)();
+static int (IVP_Environment::*must_perform_movement_check_orig)();
+
+struct IVP_Environment_Hook {
+    int MustPerformMovementCheck() {
+        auto &next_movement_check = *reinterpret_cast<short *>(this + 0x140);
+        next_movement_check = 0;
+        return 1;
+    }
+};
+
+typedef int (CKBaseManager::*PreProcessFunc)();
 
 class TimeManagerHook : public CKTimeManager {
 public:
@@ -316,10 +327,6 @@ void TASSupport::OnProcess() {
         if (m_BML->IsCheatEnabled() && IsRecording())
             OnStop();
 #endif
-
-        if (!m_Legacy && (IsRecording() || IsPlaying())) {
-            SetNextMovementCheck();
-        }
 
         if (m_Level01 && m_Level01->IsVisible()) {
             const ImVec2 &vpSize = ImGui::GetMainViewport()->Size;
@@ -730,6 +737,8 @@ void TASSupport::InitHooks() {
 
         qh_rand = ForceReinterpretCast<decltype(qh_rand)>(base, 0x52F50);
 
+        must_perform_movement_check = ForceReinterpretCast<decltype(must_perform_movement_check)>(base, 0x13610);
+
         if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&qh_rand),
                           reinterpret_cast<LPVOID>(QH_Rand),
                           reinterpret_cast<LPVOID *>(&qh_rand_orig)) != MH_OK ||
@@ -737,9 +746,18 @@ void TASSupport::InitHooks() {
             GetLogger()->Error("Failed to hook qh_rand");
             return;
         }
+
+        auto detour = &IVP_Environment_Hook::MustPerformMovementCheck;
+        if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&must_perform_movement_check),
+                          *reinterpret_cast<LPVOID *>(&detour),
+                          reinterpret_cast<LPVOID *>(&must_perform_movement_check_orig)) != MH_OK ||
+            MH_EnableHook(*reinterpret_cast<LPVOID *>(&must_perform_movement_check)) != MH_OK) {
+            GetLogger()->Error("Failed to hook must_perform_movement_check");
+            return;
+        }
     }
 
-    void **vtableTimeManager = reinterpret_cast<void **>(*reinterpret_cast<void **>(m_TimeManager));
+    void **vtableTimeManager = static_cast<void **>(*reinterpret_cast<void **>(m_TimeManager));
     TimeManagerHook::s_PreProcessFuncTarget = *reinterpret_cast<PreProcessFunc *>(&vtableTimeManager[5]);
     if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&TimeManagerHook::s_PreProcessFuncTarget),
                       *reinterpret_cast<LPVOID *>(&TimeManagerHook::s_PreProcessFunc),
@@ -750,7 +768,7 @@ void TASSupport::InitHooks() {
     }
 
     auto *inputManager = (CKInputManager *) m_BML->GetCKContext()->GetManagerByGuid(INPUT_MANAGER_GUID);
-    void **vtableInputManager = reinterpret_cast<void **>(*reinterpret_cast<void **>(inputManager));
+    void **vtableInputManager = static_cast<void **>(*reinterpret_cast<void **>(inputManager));
     InputManagerHook::s_PreProcessFuncTarget = *reinterpret_cast<PreProcessFunc *>(&vtableInputManager[5]);
     if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&InputManagerHook::s_PreProcessFuncTarget),
                       *reinterpret_cast<LPVOID *>(&InputManagerHook::s_PreProcessFunc),
@@ -767,6 +785,9 @@ void TASSupport::ShutdownHooks() {
     if (!m_Legacy) {
         MH_DisableHook(*reinterpret_cast<LPVOID *>(&qh_rand));
         MH_RemoveHook(*reinterpret_cast<LPVOID *>(&qh_rand));
+
+        MH_DisableHook(*reinterpret_cast<LPVOID *>(&must_perform_movement_check));
+        MH_RemoveHook(*reinterpret_cast<LPVOID *>(&must_perform_movement_check));
     }
 
     MH_DisableHook(*reinterpret_cast<void **>(&TimeManagerHook::s_PreProcessFuncTarget));
