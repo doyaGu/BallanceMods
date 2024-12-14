@@ -393,8 +393,8 @@ void TASSupport::OnPostStartMenu() {
 
                         CKContext *ctx = m_BML->GetCKContext();
                         CKMessageManager *mm = ctx->GetMessageManager();
-                        CKMessageType loadLevel = mm->AddMessageType("Load Level");
-                        CKMessageType loadMenu = mm->AddMessageType("Menu_Load");
+                        CKMessageType loadLevel = mm->AddMessageType((CKSTRING) "Load Level");
+                        CKMessageType loadMenu = mm->AddMessageType((CKSTRING) "Menu_Load");
 
                         mm->SendMessageSingle(loadLevel, ctx->GetCurrentLevel());
                         mm->SendMessageSingle(loadMenu, m_BML->GetGroupByName("All_Sound"));
@@ -866,7 +866,7 @@ void TASSupport::SetupNewRecord() {
 void TASSupport::RefreshRecords() {
     m_Records.clear();
 
-    CKDirectoryParser tasTraverser((CKSTRING) BML_TAS_PATH, "*.tas", TRUE);
+    CKDirectoryParser tasTraverser((CKSTRING) BML_TAS_PATH, (CKSTRING) "*.tas", TRUE);
     for (char *tasPath = tasTraverser.GetNextFile(); tasPath != nullptr; tasPath = tasTraverser.GetNextFile()) {
         std::string tasFile = tasPath;
         auto start = tasFile.find_last_of('\\') + 1;
