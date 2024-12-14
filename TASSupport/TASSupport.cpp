@@ -63,47 +63,6 @@ static CKDWORD GetPhysicsRTVersion() {
     return 0;
 }
 
-static char *UncompressDataFromFile(const char *filename, size_t &size) {
-    if (!filename)
-        return nullptr;
-
-    FILE *fp = fopen(filename, "rb");
-    if (!fp) return nullptr;
-
-    fseek(fp, 0, SEEK_END);
-    int nsize = ftell(fp) - 4;
-    fseek(fp, 0, SEEK_SET);
-
-    char *buffer = new char[nsize];
-    fread(&size, sizeof(size_t), 1, fp);
-    fread(buffer, nsize, 1, fp);
-    fclose(fp);
-
-    char *res = CKUnPackData((int) size, buffer, nsize);
-    delete[] buffer;
-
-    return res;
-}
-
-static bool CompressDataToFile(char *data, size_t size, const char *filename) {
-    if (!data || size == 0 || !filename)
-        return false;
-
-    int nsize;
-    char *res = CKPackData(data, (int) size, nsize, 9);
-
-    FILE *fp = fopen(filename, "wb");
-    if (!fp) return false;
-
-    fwrite(&size, sizeof(size_t), 1, fp);
-    fwrite(res, nsize, 1, fp);
-    fclose(fp);
-
-    CKDeletePointer(res);
-
-    return true;
-}
-
 // qh_RANDOMmax
 static const int QH_RAND_MAX = 2147483646;
 
@@ -315,33 +274,6 @@ bool UnhookRandom() {
     CKBehaviorPrototype *randomProto = CKGetPrototypeFromGuid(VT_LOGICS_RANDOM);
     if (!randomProto) return false;
     randomProto->SetFunction(g_RandomOrig);
-    return true;
-}
-
-bool TASRecord::Load() {
-    if (m_Path.empty())
-        return false;
-
-    size_t size = 0;
-    char *data = UncompressDataFromFile(m_Path.c_str(), size);
-    if (data) {
-        const size_t count = size / sizeof(FrameData);
-        m_FrameData.resize(count);
-        for (size_t i = 0; i < count; i++) {
-            memcpy(&m_FrameData[i], &data[i * sizeof(FrameData)], sizeof(FrameData));
-        }
-        CKDeletePointer(data);
-    }
-
-    m_Loaded = true;
-    return true;
-}
-
-bool TASRecord::Save() {
-    if (m_Path.empty())
-        return false;
-
-    CompressDataToFile((char *) &m_FrameData[0], m_FrameData.size() * sizeof(FrameData), m_Path.c_str());
     return true;
 }
 
@@ -586,15 +518,49 @@ void TASSupport::OnExitGame() {
 
 void TASSupport::OnPreLoadLevel() { OnStart(); }
 
+void TASSupport::OnStartLevel() {
+    if (IsRecording()) {
+        auto &sector = m_NewRecord.NewSector();
+        sector.id = (int) m_NewRecord.GetSectorCount();
+        sector.frameStart = (int) m_NewRecord.GetFrameIndex();
+        GetLogger()->Info("Sector %d started at frame %d", sector.id, sector.frameStart);
+    }
+}
+
 void TASSupport::OnPreResetLevel() { OnStop(); }
 
 void TASSupport::OnPreExitLevel() { OnStop(); }
 
-void TASSupport::OnLevelFinish() { OnFinish(); }
+void TASSupport::OnLevelFinish() {
+    if (IsRecording()) {
+        auto &sector = m_NewRecord.GetCurrentSector();
+        sector.frameEnd = (int) m_NewRecord.GetFrameIndex();
+        GetLogger()->Info("Sector %d finished at frame %d", sector.id, sector.frameEnd);
+    }
+
+    OnFinish();
+}
 
 void TASSupport::OnBallOff() {
     if (m_Enabled->GetBoolean() && IsPlaying() && m_ExitOnDead->GetBoolean())
         m_BML->ExitGame();
+}
+
+void TASSupport::OnPreCheckpointReached() {
+    if (IsRecording()) {
+        auto &sector = m_NewRecord.GetCurrentSector();
+        sector.frameEnd = (int) m_NewRecord.GetFrameIndex();
+        GetLogger()->Info("Sector %d finished at frame %d", sector.id, sector.frameEnd);
+    }
+}
+
+void TASSupport::OnPostCheckpointReached() {
+    if (IsRecording()) {
+        auto &sector = m_NewRecord.NewSector();
+        sector.id = (int) m_NewRecord.GetSectorCount();
+        sector.frameStart = (int) m_NewRecord.GetFrameIndex();
+        GetLogger()->Info("Sector %d started at frame %d", sector.id, sector.frameStart);
+    }
 }
 
 #ifdef _DEBUG
@@ -702,7 +668,7 @@ void TASSupport::OnFinish() {
 void TASSupport::OnPreProcessInput() {
     if (IsPlaying()) {
         if (m_CurrentRecord->IsPlaying()) {
-            auto state = m_CurrentRecord->GetFrameData().GetKeyState();
+            auto state = m_CurrentRecord->GetFrames().inputState;
             SetKeyboardState(m_InputHook->GetKeyboardState(), state);
             m_CurrentRecord->NextFrame();
         } else {
@@ -712,14 +678,14 @@ void TASSupport::OnPreProcessInput() {
 
     if (IsRecording()) {
         auto state = GetKeyboardState(m_InputHook->GetKeyboardState());
-        m_NewRecord.GetFrameData().SetKeyState(state);
+        m_NewRecord.GetFrames().inputState = state;
     }
 }
 
 void TASSupport::OnPreProcessTime() {
     if (IsPlaying()) {
         if (m_CurrentRecord->IsPlaying()) {
-            float delta = m_CurrentRecord->GetFrameData().GetDeltaTime();
+            float delta = m_CurrentRecord->GetFrames().deltaTime;
             m_TimeManager->SetLastDeltaTime(delta);
         } else {
             OnStop();
@@ -727,7 +693,7 @@ void TASSupport::OnPreProcessTime() {
     }
 
     if (IsRecording()) {
-        m_NewRecord.NewFrame(FrameData(m_TimeManager->GetLastDeltaTime()));
+        m_NewRecord.NewFrame(GameFrame(m_TimeManager->GetLastDeltaTime()));
     }
 }
 
@@ -818,16 +784,16 @@ void TASSupport::OnDrawKeys() {
         if (ImGui::Begin("TAS Keys", nullptr, WinFlags)) {
             ImDrawList *drawList = ImGui::GetWindowDrawList();
 
-            KeyState state = m_CurrentRecord->GetFrameData().GetKeyState();
+            InputState state = m_CurrentRecord->GetFrames().inputState;
 
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.56f, 0.76f)), Bui::BUTTON_SMALL, state.key_up ? 1 : 2, "^");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.56f, 0.8f)), Bui::BUTTON_SMALL, state.key_down ? 1 : 2, "v");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.48f, 0.8f)), Bui::BUTTON_SMALL, state.key_left ? 1 : 2, "<");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.64f, 0.8f)), Bui::BUTTON_SMALL, state.key_right ? 1 : 2, ">");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.30f, 0.8f)), Bui::BUTTON_SMALL, state.key_shift ? 1 : 2, "Shift");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.38f, 0.8f)), Bui::BUTTON_SMALL, state.key_space ? 1 : 2, "Space");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.38f, 0.76f)), Bui::BUTTON_SMALL, state.key_q ? 1 : 2, "Q");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.30f, 0.76f)), Bui::BUTTON_SMALL, state.key_esc ? 1 : 2, "ESC");
+            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.56f, 0.76f)), Bui::BUTTON_SMALL, state.keyUp ? 1 : 2, "^");
+            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.56f, 0.8f)), Bui::BUTTON_SMALL, state.keyDown ? 1 : 2, "v");
+            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.48f, 0.8f)), Bui::BUTTON_SMALL, state.keyLeft ? 1 : 2, "<");
+            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.64f, 0.8f)), Bui::BUTTON_SMALL, state.keyRight ? 1 : 2, ">");
+            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.30f, 0.8f)), Bui::BUTTON_SMALL, state.keyShift ? 1 : 2, "Shift");
+            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.38f, 0.8f)), Bui::BUTTON_SMALL, state.keySpace ? 1 : 2, "Space");
+            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.38f, 0.76f)), Bui::BUTTON_SMALL, state.keyQ ? 1 : 2, "Q");
+            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.30f, 0.76f)), Bui::BUTTON_SMALL, state.keyEsc ? 1 : 2, "ESC");
 
             sprintf(m_FrameCountText, "#%d", m_CurrentRecord->GetFrameIndex());
             const auto textSize = ImGui::CalcTextSize(m_FrameCountText);
@@ -1052,6 +1018,7 @@ void TASSupport::SetupNewRecord() {
 
     m_NewRecord.SetName(filename);
     m_NewRecord.SetPath(filepath);
+    m_NewRecord.SetMapName(m_MapName);
 }
 
 void TASSupport::RefreshRecords() {
@@ -1091,33 +1058,33 @@ void TASSupport::ExitTASMenu() {
     });
 }
 
-KeyState TASSupport::GetKeyboardState(const unsigned char *src) const {
-    KeyState state = {};
+InputState TASSupport::GetKeyboardState(const unsigned char *src) const {
+    InputState state = {};
     if (src) {
-        state.key_up = src[m_KeyUp];
-        state.key_down = src[m_KeyDown];
-        state.key_left = src[m_KeyLeft];
-        state.key_right = src[m_KeyRight];
-        state.key_q = src[CKKEY_Q];
-        state.key_shift = src[m_KeyShift];
-        state.key_space = src[m_KeySpace];
-        state.key_esc = src[CKKEY_ESCAPE];
-        state.key_enter = src[CKKEY_RETURN];
+        state.keyUp = src[m_KeyUp];
+        state.keyDown = src[m_KeyDown];
+        state.keyLeft = src[m_KeyLeft];
+        state.keyRight = src[m_KeyRight];
+        state.keyQ = src[CKKEY_Q];
+        state.keyShift = src[m_KeyShift];
+        state.keySpace = src[m_KeySpace];
+        state.keyEsc = src[CKKEY_ESCAPE];
+        state.keyEnter = src[CKKEY_RETURN];
     }
 
     return state;
 }
 
-void TASSupport::SetKeyboardState(unsigned char *dest, const KeyState &state) const {
-    dest[m_KeyUp] = state.key_up;
-    dest[m_KeyDown] = state.key_down;
-    dest[m_KeyLeft] = state.key_left;
-    dest[m_KeyRight] = state.key_right;
-    dest[CKKEY_Q] = state.key_q;
-    dest[m_KeyShift] = state.key_shift;
-    dest[m_KeySpace] = state.key_space;
-    dest[CKKEY_ESCAPE] = state.key_esc;
-    dest[CKKEY_RETURN] = state.key_enter;
+void TASSupport::SetKeyboardState(unsigned char *dest, const InputState &state) const {
+    dest[m_KeyUp] = state.keyUp;
+    dest[m_KeyDown] = state.keyDown;
+    dest[m_KeyLeft] = state.keyLeft;
+    dest[m_KeyRight] = state.keyRight;
+    dest[CKKEY_Q] = state.keyQ;
+    dest[m_KeyShift] = state.keyShift;
+    dest[m_KeySpace] = state.keySpace;
+    dest[CKKEY_ESCAPE] = state.keyEsc;
+    dest[CKKEY_RETURN] = state.keyEnter;
 }
 
 void TASSupport::ResetKeyboardState(unsigned char *dest) const {

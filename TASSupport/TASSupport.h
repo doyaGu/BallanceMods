@@ -6,6 +6,7 @@
 #include <BML/BMLAll.h>
 
 #include "physics_RT.h"
+#include "TASRecord.h"
 
 MOD_EXPORT IMod *BMLEntry(IBML *bml);
 MOD_EXPORT void BMLExit(IMod *mod);
@@ -15,109 +16,6 @@ typedef enum TASState {
     TAS_PLAYING = 0x1,
     TAS_RECORDING = 0x2,
 } TASState;
-
-struct KeyState {
-    unsigned key_up: 1;
-    unsigned key_down: 1;
-    unsigned key_left: 1;
-    unsigned key_right: 1;
-    unsigned key_shift: 1;
-    unsigned key_space: 1;
-    unsigned key_q: 1;
-    unsigned key_esc: 1;
-    unsigned key_enter: 1;
-};
-
-class FrameData {
-public:
-    FrameData() = default;
-    explicit FrameData(float deltaTime) : m_DeltaTime(deltaTime) {}
-
-    float GetDeltaTime() const {
-        return m_DeltaTime;
-    }
-
-    void SetDeltaTime(float delta) {
-        m_DeltaTime = delta;
-    }
-
-    const KeyState &GetKeyState() const {
-        return m_KeyState;
-    }
-
-    void SetKeyState(const KeyState &state) {
-        m_KeyState = state;
-    }
-
-private:
-    float m_DeltaTime = 0.0f;
-    KeyState m_KeyState = {};
-};
-
-struct PhysicsData {
-    PhysicsData() = default;
-    explicit PhysicsData(float deltaTime) : deltaTime(deltaTime) {}
-
-    float deltaTime = 0.0f;
-    VxVector position;
-    VxVector angles;
-    VxVector velocity;
-    VxVector angularVelocity;
-};
-
-class TASRecord {
-public:
-    TASRecord() = default;
-    TASRecord(std::string name, std::string path) : m_Name(std::move(name)), m_Path(std::move(path)) {}
-
-    bool operator==(const TASRecord &rhs) const { return m_Name == rhs.m_Name; }
-    bool operator!=(const TASRecord &rhs) const { return !(rhs == *this); }
-
-    bool operator<(const TASRecord &o) const { return m_Name < o.m_Name; }
-    bool operator>(const TASRecord &rhs) const { return rhs < *this; }
-    bool operator<=(const TASRecord &rhs) const { return !(rhs < *this); }
-    bool operator>=(const TASRecord &rhs) const { return !(*this < rhs); }
-
-    const std::string &GetName() const { return m_Name; }
-    void SetName(const std::string &name) { m_Name = name; }
-
-    const std::string &GetPath() const { return m_Path; }
-    void SetPath(const std::string &path) { m_Path = path; }
-
-    bool IsLoaded() const { return m_Loaded; }
-    bool Load();
-    bool Save();
-
-    bool IsPlaying() const { return m_FrameIndex < m_FrameData.size(); }
-    bool IsFinished() const { return m_FrameIndex == m_FrameData.size(); }
-
-    size_t GetLength() const { return m_FrameData.size(); }
-    size_t GetFrameIndex() const { return m_FrameIndex; }
-    FrameData &GetFrameData() { return m_FrameData[m_FrameIndex]; }
-
-    void NextFrame() { ++m_FrameIndex; }
-    void PrevFrame() { --m_FrameIndex; }
-    void ResetFrame() { m_FrameIndex = 0; }
-
-    void NewFrame(const FrameData &frame) {
-        if (!m_FrameData.empty())
-            ++m_FrameIndex;
-        m_FrameData.emplace_back(frame);
-    }
-
-    void Clear() {
-        m_Loaded = false;
-        m_FrameIndex = 0;
-        m_FrameData.clear();
-    }
-
-private:
-    std::string m_Name;
-    std::string m_Path;
-    bool m_Loaded = false;
-    std::size_t m_FrameIndex = 0;
-    std::vector<FrameData> m_FrameData;
-};
 
 class TASSupport : public IMod {
 public:
@@ -143,11 +41,13 @@ public:
     void OnPostStartMenu() override;
     void OnExitGame() override;
     void OnPreLoadLevel() override;
-
+    void OnStartLevel() override;
     void OnPreResetLevel() override;
     void OnPreExitLevel() override;
     void OnLevelFinish() override;
     void OnBallOff() override;
+    void OnPreCheckpointReached() override;
+    void OnPostCheckpointReached() override;
 
 #ifdef _DEBUG
     void OnPhysicalize(CK3dEntity *target, CKBOOL fixed, float friction, float elasticity, float mass,
@@ -185,8 +85,8 @@ public:
     void OpenTASMenu();
     void ExitTASMenu();
 
-    KeyState GetKeyboardState(const unsigned char *src) const;
-    void SetKeyboardState(unsigned char *dest, const KeyState &state) const;
+    InputState GetKeyboardState(const unsigned char *src) const;
+    void SetKeyboardState(unsigned char *dest, const InputState &state) const;
     void ResetKeyboardState(unsigned char *dest) const;
 
     CK3dEntity *GetActiveBall() const;
