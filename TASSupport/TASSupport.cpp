@@ -502,6 +502,8 @@ void TASSupport::OnStop() {
             m_NewRecord.Save();
             m_NewRecord.Clear();
         }).detach();
+
+        m_Record->SetBoolean(false);
     }
 
     if (IsPlaying()) {
