@@ -159,6 +159,165 @@ PreProcessFunc InputManagerHook::s_PreProcessFunc = reinterpret_cast<PreProcessF
 PreProcessFunc InputManagerHook::s_PreProcessFuncOrig = nullptr;
 PreProcessFunc InputManagerHook::s_PreProcessFuncTarget = nullptr;
 
+static int g_FixedRandomValue = RAND_MAX / 2;
+static CKBEHAVIORFCT g_RandomOrig = nullptr;
+
+#undef min
+#undef max
+
+int Random(const CKBehaviorContext &behcontext) {
+    CKBehavior *beh = behcontext.Behavior;
+
+    // Set IOs States
+    beh->ActivateInput(0, FALSE);
+    beh->ActivateOutput(0);
+
+    CKParameterIn *pin;
+    CKParameterOut *pout = beh->GetOutputParameter(0);
+    CKGUID guid = pout->GetGUID();
+
+#define pincheck(index)                      \
+    {                                        \
+        pin = beh->GetInputParameter(index); \
+        if (!pin)                            \
+            return CKBR_OK;                  \
+        if (pin->GetGUID() != guid)          \
+            return CKBR_OK;                  \
+    }
+
+    CKParameterManager *pm = behcontext.ParameterManager;
+    if (pm->IsDerivedFrom(guid, CKPGUID_FLOAT)) {
+        pincheck(0);
+        float min;
+        pin->GetValue(&min);
+
+        pincheck(1);
+        float max;
+        pin->GetValue(&max);
+
+        float res = min + g_FixedRandomValue * (max - min) / RAND_MAX;
+        pout->SetValue(&res);
+
+        return CKBR_OK;
+    }
+
+    if (guid == CKPGUID_INT) {
+        pincheck(0);
+        int min;
+        pin->GetValue(&min);
+
+        pincheck(1);
+        int max;
+        pin->GetValue(&max);
+
+        int res = min + g_FixedRandomValue * (max - min) / RAND_MAX;
+        pout->SetValue(&res);
+
+        return CKBR_OK;
+    }
+
+    if (guid == CKPGUID_VECTOR) {
+        pincheck(0);
+        VxVector min(0.0f);
+        pin->GetValue(&min);
+
+        pincheck(1);
+        VxVector max(0.0f);
+        pin->GetValue(&max);
+
+        VxVector res;
+        res.x = min.x + g_FixedRandomValue * (max.x - min.x) / RAND_MAX;
+        res.y = min.y + g_FixedRandomValue * (max.y - min.y) / RAND_MAX;
+        res.z = min.z + g_FixedRandomValue * (max.z - min.z) / RAND_MAX;
+
+        pout->SetValue(&res);
+
+        return CKBR_OK;
+    }
+
+    if (guid == CKPGUID_2DVECTOR) {
+        pincheck(0);
+        Vx2DVector min;
+        pin->GetValue(&min);
+
+        pincheck(1);
+        Vx2DVector max;
+        pin->GetValue(&max);
+
+        Vx2DVector res;
+        res.x = min.x + g_FixedRandomValue * (max.x - min.x) / RAND_MAX;
+        res.y = min.y + g_FixedRandomValue * (max.y - min.y) / RAND_MAX;
+
+        pout->SetValue(&res);
+
+        return CKBR_OK;
+    }
+
+    if (guid == CKPGUID_RECT) {
+        pincheck(0);
+        VxRect min;
+        pin->GetValue(&min);
+
+        pincheck(1);
+        VxRect max;
+        pin->GetValue(&max);
+
+        VxRect res;
+        res.left = min.left + g_FixedRandomValue * (max.left - min.left) / RAND_MAX;
+        res.top = min.top + g_FixedRandomValue * (max.top - min.top) / RAND_MAX;
+        res.right = min.right + g_FixedRandomValue * (max.right - min.right) / RAND_MAX;
+        res.bottom = min.bottom + g_FixedRandomValue * (max.bottom - min.bottom) / RAND_MAX;
+        res.Normalize();
+        pout->SetValue(&res);
+
+        return CKBR_OK;
+    }
+
+    if (guid == CKPGUID_BOOL) {
+        CKBOOL res = g_FixedRandomValue & 1;
+
+        pout->SetValue(&res);
+
+        return CKBR_OK;
+    }
+
+    if (guid == CKPGUID_COLOR) {
+        pincheck(0);
+        VxColor min;
+        pin->GetValue(&min);
+
+        pincheck(1);
+        VxColor max;
+        pin->GetValue(&max);
+
+        VxColor res;
+        res.r = min.r + g_FixedRandomValue * (max.r - min.r) / RAND_MAX;
+        res.g = min.g + g_FixedRandomValue * (max.g - min.g) / RAND_MAX;
+        res.b = min.b + g_FixedRandomValue * (max.b - min.b) / RAND_MAX;
+        res.a = min.a + g_FixedRandomValue * (max.a - min.a) / RAND_MAX;
+        pout->SetValue(&res);
+
+        return CKBR_OK;
+    }
+
+    return CKBR_OK;
+}
+
+bool HookRandom() {
+    CKBehaviorPrototype *randomProto = CKGetPrototypeFromGuid(VT_LOGICS_RANDOM);
+    if (!randomProto) return false;
+    if (!g_RandomOrig) g_RandomOrig = randomProto->GetFunction();
+    randomProto->SetFunction(&Random);
+    return true;
+}
+
+bool UnhookRandom() {
+    CKBehaviorPrototype *randomProto = CKGetPrototypeFromGuid(VT_LOGICS_RANDOM);
+    if (!randomProto) return false;
+    randomProto->SetFunction(g_RandomOrig);
+    return true;
+}
+
 bool TASRecord::Load() {
     if (m_Path.empty())
         return false;
@@ -301,12 +460,15 @@ void TASSupport::OnLoadObject(const char *filename, CKBOOL isMap, const char *ma
 
 void TASSupport::OnLoadScript(const char *filename, CKBehavior *script) {
     if (m_Enabled->GetBoolean()) {
-        if (!strcmp(script->GetName(), "Ball_Explosion_Wood")
-            || !strcmp(script->GetName(), "Ball_Explosion_Paper")
-            || !strcmp(script->GetName(), "Ball_Explosion_Stone")) {
-            CKBehavior *beh = ScriptHelper::FindFirstBB(script, "Set Position");
-            ScriptHelper::DeleteBB(script, beh);
+        if (m_Legacy) {
+            if (!strcmp(script->GetName(), "Ball_Explosion_Wood")
+                || !strcmp(script->GetName(), "Ball_Explosion_Paper")
+                || !strcmp(script->GetName(), "Ball_Explosion_Stone")) {
+                CKBehavior *beh = ScriptHelper::FindFirstBB(script, "Set Position");
+                ScriptHelper::DeleteBB(script, beh);
+            }
         }
+
         if (!strcmp(script->GetName(), "Gameplay_Ingame")) {
             for (int i = 0; i < script->GetLocalParameterCount(); ++i) {
                 CKParameter *param = script->GetLocalParameter(i);
@@ -776,6 +938,10 @@ void TASSupport::InitHooks() {
         MH_EnableHook(*reinterpret_cast<LPVOID *>(&InputManagerHook::s_PreProcessFuncTarget)) != MH_OK) {
         GetLogger()->Error("Failed to hook Input Manager");
     }
+
+    if (!m_Legacy) {
+        HookRandom();
+    }
 }
 
 void TASSupport::ShutdownHooks() {
@@ -795,6 +961,10 @@ void TASSupport::ShutdownHooks() {
 
     MH_DisableHook(*reinterpret_cast<void **>(&InputManagerHook::s_PreProcessFuncTarget));
     MH_RemoveHook(*reinterpret_cast<void **>(&InputManagerHook::s_PreProcessFuncTarget));
+
+    if (!m_Legacy) {
+        UnhookRandom();
+    }
 }
 
 void TASSupport::AcquireKeyBindings() {
