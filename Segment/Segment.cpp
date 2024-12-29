@@ -74,12 +74,10 @@ void Segment::OnPreExitLevel() {
 }
 
 void Segment::OnGameOver() {
-    session_->gui.set_cursor_visible(false);
     session_->state.enable_counting(false);
 }
 
 void Segment::OnPreEndLevel() {
-    session_->gui.set_cursor_visible(false);
     session_->state.enable_counting(false);
     session_->state.change_segment(get_current_sector() + 1);
     session_->state.update_target_figures();
