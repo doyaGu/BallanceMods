@@ -5,15 +5,9 @@
 #include <thread>
 #include <sys/stat.h>
 
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <Windows.h>
-#include <Psapi.h>
-
-#include <MinHook.h>
-
 #include <BML/Bui.h>
+
+#include "TASHook.h"
 
 #define BML_TAS_PATH "..\\ModLoader\\TASRecords\\"
 
@@ -28,253 +22,11 @@ void BMLExit(IMod *mod) {
     delete mod;
 }
 
-template<typename T>
-T ForceReinterpretCast(void *base, size_t offset) {
-    void *p = static_cast<char *>(base) + offset;
-    return *reinterpret_cast<T *>(&p);
-}
-
-static void *GetModuleBaseAddress(const char *modulePath) {
-    if (!modulePath)
-        return nullptr;
-
-    int size = ::MultiByteToWideChar(CP_UTF8, 0, modulePath, -1, nullptr, 0);
-    if (size == 0)
-        return nullptr;
-
-    auto ws = new wchar_t[size];
-    ::MultiByteToWideChar(CP_UTF8, 0, modulePath, -1, ws, size);
-
-    HMODULE hModule = ::GetModuleHandleW(ws);
-    delete[] ws;
-    if (!hModule)
-        return nullptr;
-
-    MODULEINFO moduleInfo;
-    ::GetModuleInformation(::GetCurrentProcess(), hModule, &moduleInfo, sizeof(moduleInfo));
-
-    return moduleInfo.lpBaseOfDll;
-}
-
 static CKDWORD GetPhysicsRTVersion() {
     CKPluginEntry *entry = CKGetPluginManager()->FindComponent(CKGUID(0x6BED328B, 0x141F5148));
     if (entry)
         return entry->m_PluginInfo.m_Version;
     return 0;
-}
-
-// qh_RANDOMmax
-static const int QH_RAND_MAX = 2147483646;
-
-static int (*qh_rand)() = nullptr;
-static int (*qh_rand_orig)() = nullptr;
-
-int QH_Rand() { return QH_RAND_MAX; }
-
-static int (IVP_Environment::*must_perform_movement_check)();
-static int (IVP_Environment::*must_perform_movement_check_orig)();
-
-struct IVP_Environment_Hook {
-    int MustPerformMovementCheck() {
-        auto &next_movement_check = *reinterpret_cast<short *>(this + 0x140);
-        next_movement_check = 0;
-        return 1;
-    }
-};
-
-typedef int (CKBaseManager::*PreProcessFunc)();
-
-class TimeManagerHook : public CKTimeManager {
-public:
-    CKERROR PreProcessHook() {
-        CKERROR ret = (this->*s_PreProcessFuncOrig)();
-        g_Mod->OnPreProcessTime();
-        return ret;
-    }
-
-    static PreProcessFunc s_PreProcessFunc;
-    static PreProcessFunc s_PreProcessFuncOrig;
-    static PreProcessFunc s_PreProcessFuncTarget;
-};
-
-PreProcessFunc TimeManagerHook::s_PreProcessFunc = reinterpret_cast<PreProcessFunc>(&TimeManagerHook::PreProcessHook);
-PreProcessFunc TimeManagerHook::s_PreProcessFuncOrig = nullptr;
-PreProcessFunc TimeManagerHook::s_PreProcessFuncTarget = nullptr;
-
-class InputManagerHook : public CKInputManager {
-public:
-    CKERROR PreProcessHook() {
-        CKERROR ret = (this->*s_PreProcessFuncOrig)();
-        g_Mod->OnPreProcessInput();
-        return ret;
-    }
-
-    static PreProcessFunc s_PreProcessFunc;
-    static PreProcessFunc s_PreProcessFuncOrig;
-    static PreProcessFunc s_PreProcessFuncTarget;
-};
-
-PreProcessFunc InputManagerHook::s_PreProcessFunc = reinterpret_cast<PreProcessFunc>(&InputManagerHook::PreProcessHook);
-PreProcessFunc InputManagerHook::s_PreProcessFuncOrig = nullptr;
-PreProcessFunc InputManagerHook::s_PreProcessFuncTarget = nullptr;
-
-static int g_FixedRandomValue = RAND_MAX / 2;
-static CKBEHAVIORFCT g_RandomOrig = nullptr;
-
-#undef min
-#undef max
-
-int Random(const CKBehaviorContext &behcontext) {
-    CKBehavior *beh = behcontext.Behavior;
-
-    // Set IOs States
-    beh->ActivateInput(0, FALSE);
-    beh->ActivateOutput(0);
-
-    CKParameterIn *pin;
-    CKParameterOut *pout = beh->GetOutputParameter(0);
-    CKGUID guid = pout->GetGUID();
-
-#define pincheck(index)                      \
-    {                                        \
-        pin = beh->GetInputParameter(index); \
-        if (!pin)                            \
-            return CKBR_OK;                  \
-        if (pin->GetGUID() != guid)          \
-            return CKBR_OK;                  \
-    }
-
-    CKParameterManager *pm = behcontext.ParameterManager;
-    if (pm->IsDerivedFrom(guid, CKPGUID_FLOAT)) {
-        pincheck(0);
-        float min;
-        pin->GetValue(&min);
-
-        pincheck(1);
-        float max;
-        pin->GetValue(&max);
-
-        float res = min + g_FixedRandomValue * (max - min) / RAND_MAX;
-        pout->SetValue(&res);
-
-        return CKBR_OK;
-    }
-
-    if (guid == CKPGUID_INT) {
-        pincheck(0);
-        int min;
-        pin->GetValue(&min);
-
-        pincheck(1);
-        int max;
-        pin->GetValue(&max);
-
-        int res = min + g_FixedRandomValue * (max - min) / RAND_MAX;
-        pout->SetValue(&res);
-
-        return CKBR_OK;
-    }
-
-    if (guid == CKPGUID_VECTOR) {
-        pincheck(0);
-        VxVector min(0.0f);
-        pin->GetValue(&min);
-
-        pincheck(1);
-        VxVector max(0.0f);
-        pin->GetValue(&max);
-
-        VxVector res;
-        res.x = min.x + g_FixedRandomValue * (max.x - min.x) / RAND_MAX;
-        res.y = min.y + g_FixedRandomValue * (max.y - min.y) / RAND_MAX;
-        res.z = min.z + g_FixedRandomValue * (max.z - min.z) / RAND_MAX;
-
-        pout->SetValue(&res);
-
-        return CKBR_OK;
-    }
-
-    if (guid == CKPGUID_2DVECTOR) {
-        pincheck(0);
-        Vx2DVector min;
-        pin->GetValue(&min);
-
-        pincheck(1);
-        Vx2DVector max;
-        pin->GetValue(&max);
-
-        Vx2DVector res;
-        res.x = min.x + g_FixedRandomValue * (max.x - min.x) / RAND_MAX;
-        res.y = min.y + g_FixedRandomValue * (max.y - min.y) / RAND_MAX;
-
-        pout->SetValue(&res);
-
-        return CKBR_OK;
-    }
-
-    if (guid == CKPGUID_RECT) {
-        pincheck(0);
-        VxRect min;
-        pin->GetValue(&min);
-
-        pincheck(1);
-        VxRect max;
-        pin->GetValue(&max);
-
-        VxRect res;
-        res.left = min.left + g_FixedRandomValue * (max.left - min.left) / RAND_MAX;
-        res.top = min.top + g_FixedRandomValue * (max.top - min.top) / RAND_MAX;
-        res.right = min.right + g_FixedRandomValue * (max.right - min.right) / RAND_MAX;
-        res.bottom = min.bottom + g_FixedRandomValue * (max.bottom - min.bottom) / RAND_MAX;
-        res.Normalize();
-        pout->SetValue(&res);
-
-        return CKBR_OK;
-    }
-
-    if (guid == CKPGUID_BOOL) {
-        CKBOOL res = g_FixedRandomValue & 1;
-
-        pout->SetValue(&res);
-
-        return CKBR_OK;
-    }
-
-    if (guid == CKPGUID_COLOR) {
-        pincheck(0);
-        VxColor min;
-        pin->GetValue(&min);
-
-        pincheck(1);
-        VxColor max;
-        pin->GetValue(&max);
-
-        VxColor res;
-        res.r = min.r + g_FixedRandomValue * (max.r - min.r) / RAND_MAX;
-        res.g = min.g + g_FixedRandomValue * (max.g - min.g) / RAND_MAX;
-        res.b = min.b + g_FixedRandomValue * (max.b - min.b) / RAND_MAX;
-        res.a = min.a + g_FixedRandomValue * (max.a - min.a) / RAND_MAX;
-        pout->SetValue(&res);
-
-        return CKBR_OK;
-    }
-
-    return CKBR_OK;
-}
-
-bool HookRandom() {
-    CKBehaviorPrototype *randomProto = CKGetPrototypeFromGuid(VT_LOGICS_RANDOM);
-    if (!randomProto) return false;
-    if (!g_RandomOrig) g_RandomOrig = randomProto->GetFunction();
-    randomProto->SetFunction(&Random);
-    return true;
-}
-
-bool UnhookRandom() {
-    CKBehaviorPrototype *randomProto = CKGetPrototypeFromGuid(VT_LOGICS_RANDOM);
-    if (!randomProto) return false;
-    randomProto->SetFunction(g_RandomOrig);
-    return true;
 }
 
 void TASSupport::OnLoad() {
@@ -485,7 +237,15 @@ void TASSupport::OnPostStartMenu() {
                 m_CurrentRecord = &m_RecordOnStartup;
 
                 m_BML->SendIngameMessage(("Loading TAS Record: " + tasFile + ".tas").c_str());
-                m_CurrentRecord->Load();
+
+                try {
+                    m_CurrentRecord->Load();
+                } catch (const std::exception &e) {
+                    m_BML->SendIngameMessage((std::string("Failed to load TAS file: ") + e.what()).c_str());
+                    m_CurrentRecord = nullptr;
+                    firstTime = false;
+                    return;
+                }
 
                 int level = m_LoadLevel->GetInteger();
                 if (level >= 1 && level <= 13) {
@@ -504,8 +264,9 @@ void TASSupport::OnPostStartMenu() {
                         m_ExitMain->Activate();
                     });
                 }
-            } else
+            } else {
                 m_BML->SendIngameMessage(("TAS file " + tasFile + ".tas not found.").c_str());
+            }
         }
 
         firstTime = false;
@@ -608,6 +369,13 @@ void TASSupport::OnStart() {
         ResetPhysicsTime();
     });
 
+    CKTimeManagerHook::AddPostCallback([this](CKBaseManager *) {
+        OnPreProcessTime();
+    });
+    CKInputManagerHook::AddPostCallback([this](CKBaseManager *) {
+        OnPreProcessInput();
+    });
+
     AcquireKeyBindings();
 
     if (m_Record->GetBoolean()) {
@@ -651,6 +419,9 @@ void TASSupport::OnStop() {
         }
     }
 
+    CKTimeManagerHook::ClearPostCallbacks();
+    CKInputManagerHook::ClearPostCallbacks();
+
     if (!m_Legacy) {
         m_BML->AddTimer(1ul, [this]() {
             SetPhysicsTimeFactor();
@@ -668,7 +439,7 @@ void TASSupport::OnFinish() {
 void TASSupport::OnPreProcessInput() {
     if (IsPlaying()) {
         if (m_CurrentRecord->IsPlaying()) {
-            auto state = m_CurrentRecord->GetFrames().inputState;
+            const auto state = m_CurrentRecord->GetFrames().inputState;
             SetKeyboardState(m_InputHook->GetKeyboardState(), state);
             m_CurrentRecord->NextFrame();
         } else {
@@ -685,7 +456,7 @@ void TASSupport::OnPreProcessInput() {
 void TASSupport::OnPreProcessTime() {
     if (IsPlaying()) {
         if (m_CurrentRecord->IsPlaying()) {
-            float delta = m_CurrentRecord->GetFrames().deltaTime;
+            const float delta = m_CurrentRecord->GetFrames().deltaTime;
             m_TimeManager->SetLastDeltaTime(delta);
         } else {
             OnStop();
@@ -703,14 +474,12 @@ void TASSupport::OnDrawMenu() {
     ImGui::SetNextWindowSize(ImVec2(vpSize.x * 0.7f, vpSize.y), ImGuiCond_Appearing);
 
     constexpr auto TitleText = "TAS Records";
-
     constexpr ImGuiWindowFlags MenuWinFlags = ImGuiWindowFlags_NoDecoration |
                                               ImGuiWindowFlags_NoBackground |
                                               ImGuiWindowFlags_NoMove |
                                               ImGuiWindowFlags_NoScrollWithMouse |
                                               ImGuiWindowFlags_NoBringToFrontOnFocus |
                                               ImGuiWindowFlags_NoSavedSettings;
-
     ImGui::Begin(TitleText, nullptr, MenuWinFlags);
 
     {
@@ -719,15 +488,14 @@ void TASSupport::OnDrawMenu() {
         ImGui::PushFont(ImGui::GetFont());
 
         const auto titleSize = ImGui::CalcTextSize(TitleText);
-        ImGui::GetWindowDrawList()->AddText(ImVec2((vpSize.x - titleSize.x) / 2.0f, vpSize.y * 0.07f), IM_COL32_WHITE,
-                                            TitleText);
+        ImGui::GetWindowDrawList()->AddText(ImVec2((vpSize.x - titleSize.x) / 2.0f, vpSize.y * 0.07f), IM_COL32_WHITE, TitleText);
 
         ImGui::GetFont()->Scale = oldScale;
         ImGui::PopFont();
     }
 
     int recordCount = (int) m_Records.size();
-    int maxPage = ((recordCount % 13) == 0) ? recordCount / 13 : recordCount / 13 + 1;
+    int maxPage = (recordCount % 13) == 0 ? recordCount / 13 : recordCount / 13 + 1;
 
     if (m_CurrentPage > 0) {
         ImGui::SetCursorScreenPos(Bui::CoordToScreenPos(ImVec2(0.34f, 0.4f)));
@@ -754,7 +522,13 @@ void TASSupport::OnDrawMenu() {
 
             m_BML->SendIngameMessage(("Loading TAS Record: " + record.GetName()).c_str());
             m_CurrentRecord = &record;
-            m_CurrentRecord->Load();
+
+            try {
+                m_CurrentRecord->Load();
+            } catch (const std::exception &e) {
+                m_BML->SendIngameMessage((std::string("Failed to load TAS file: ") + e.what()).c_str());
+                m_CurrentRecord = nullptr;
+            }
         }
     }
 
@@ -856,56 +630,12 @@ void TASSupport::InitHooks() {
     if (m_Hooked)
         return;
 
-    if (!m_Legacy) {
-        void *base = GetModuleBaseAddress("physics_RT.dll");
-        if (!base) {
-            GetLogger()->Error("Failed to get physics_RT.dll base address");
-            return;
-        }
-
-        qh_rand = ForceReinterpretCast<decltype(qh_rand)>(base, 0x52F50);
-
-        must_perform_movement_check = ForceReinterpretCast<decltype(must_perform_movement_check)>(base, 0x13610);
-
-        if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&qh_rand),
-                          reinterpret_cast<LPVOID>(QH_Rand),
-                          reinterpret_cast<LPVOID *>(&qh_rand_orig)) != MH_OK ||
-            MH_EnableHook(*reinterpret_cast<LPVOID *>(&qh_rand)) != MH_OK) {
-            GetLogger()->Error("Failed to hook qh_rand");
-            return;
-        }
-
-        auto detour = &IVP_Environment_Hook::MustPerformMovementCheck;
-        if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&must_perform_movement_check),
-                          *reinterpret_cast<LPVOID *>(&detour),
-                          reinterpret_cast<LPVOID *>(&must_perform_movement_check_orig)) != MH_OK ||
-            MH_EnableHook(*reinterpret_cast<LPVOID *>(&must_perform_movement_check)) != MH_OK) {
-            GetLogger()->Error("Failed to hook must_perform_movement_check");
-            return;
-        }
-    }
-
-    void **vtableTimeManager = static_cast<void **>(*reinterpret_cast<void **>(m_TimeManager));
-    TimeManagerHook::s_PreProcessFuncTarget = *reinterpret_cast<PreProcessFunc *>(&vtableTimeManager[5]);
-    if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&TimeManagerHook::s_PreProcessFuncTarget),
-                      *reinterpret_cast<LPVOID *>(&TimeManagerHook::s_PreProcessFunc),
-                      reinterpret_cast<LPVOID *>(&TimeManagerHook::s_PreProcessFuncOrig)) != MH_OK ||
-        MH_EnableHook(*reinterpret_cast<LPVOID *>(&TimeManagerHook::s_PreProcessFuncTarget)) != MH_OK) {
-        GetLogger()->Error("Failed to hook Time Manager");
-        return;
-    }
-
+    CKTimeManagerHook::Enable(m_TimeManager);
     auto *inputManager = (CKInputManager *) m_BML->GetCKContext()->GetManagerByGuid(INPUT_MANAGER_GUID);
-    void **vtableInputManager = static_cast<void **>(*reinterpret_cast<void **>(inputManager));
-    InputManagerHook::s_PreProcessFuncTarget = *reinterpret_cast<PreProcessFunc *>(&vtableInputManager[5]);
-    if (MH_CreateHook(*reinterpret_cast<LPVOID *>(&InputManagerHook::s_PreProcessFuncTarget),
-                      *reinterpret_cast<LPVOID *>(&InputManagerHook::s_PreProcessFunc),
-                      reinterpret_cast<LPVOID *>(&InputManagerHook::s_PreProcessFuncOrig)) != MH_OK ||
-        MH_EnableHook(*reinterpret_cast<LPVOID *>(&InputManagerHook::s_PreProcessFuncTarget)) != MH_OK) {
-        GetLogger()->Error("Failed to hook Input Manager");
-    }
+    CKInputManagerHook::Enable(inputManager);
 
     if (!m_Legacy) {
+        HookPhysicsRT();
         HookRandom();
     }
 }
@@ -914,21 +644,11 @@ void TASSupport::ShutdownHooks() {
     if (!m_Hooked)
         return;
 
-    if (!m_Legacy) {
-        MH_DisableHook(*reinterpret_cast<LPVOID *>(&qh_rand));
-        MH_RemoveHook(*reinterpret_cast<LPVOID *>(&qh_rand));
-
-        MH_DisableHook(*reinterpret_cast<LPVOID *>(&must_perform_movement_check));
-        MH_RemoveHook(*reinterpret_cast<LPVOID *>(&must_perform_movement_check));
-    }
-
-    MH_DisableHook(*reinterpret_cast<void **>(&TimeManagerHook::s_PreProcessFuncTarget));
-    MH_RemoveHook(*reinterpret_cast<void **>(&TimeManagerHook::s_PreProcessFuncTarget));
-
-    MH_DisableHook(*reinterpret_cast<void **>(&InputManagerHook::s_PreProcessFuncTarget));
-    MH_RemoveHook(*reinterpret_cast<void **>(&InputManagerHook::s_PreProcessFuncTarget));
+    CKTimeManagerHook::Disable();
+    CKInputManagerHook::Disable();
 
     if (!m_Legacy) {
+        UnhookPhysicsRT();
         UnhookRandom();
     }
 }
@@ -1031,7 +751,7 @@ void TASSupport::RefreshRecords() {
         auto count = tasFile.find_last_of('.') - start;
         std::string name = tasFile.substr(start, count);
         std::string path = BML_TAS_PATH + name + ".tas";
-        m_Records.emplace_back(name, path);
+        m_Records.emplace_back(name, path, m_Legacy);
     }
 
     std::sort(m_Records.begin(), m_Records.end());

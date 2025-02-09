@@ -317,14 +317,14 @@ bool Sector::Deserialize(std::istream &in) {
 }
 
 bool InputState::Serialize(std::ostream &out) const {
-    uint16_t keyStates = (keyUp << 0) | (keyDown << 1) | (keyLeft << 2) |
+    uint32_t keyStates = (keyUp << 0) | (keyDown << 1) | (keyLeft << 2) |
                          (keyRight << 3) | (keyShift << 4) | (keySpace << 5) |
                          (keyQ << 6) | (keyEsc << 7) | (keyEnter << 8);
     return Write(out, keyStates);
 }
 
 bool InputState::Deserialize(std::istream &in) {
-    uint16_t keyStates;
+    uint32_t keyStates;
     if (!Read(in, keyStates))
         return false;
 
@@ -378,65 +378,106 @@ bool TASRecord::DecompressData(const std::vector<uint8_t> &input, std::vector<ui
 }
 
 void TASRecord::Load() {
+    Clear();
+
     std::ifstream file(m_Path, std::ios::binary);
     if (!file.is_open())
         throw std::runtime_error("Failed to open file for reading");
 
-    Clear();
+    file.seekg(0, std::ios_base::end);
+    size_t size = file.tellg();
+    file.seekg(0);
 
-    uint32_t magic, version;
-    Serializable::Read(file, magic);
-    if (magic != MAGIC_NUMBER)
+    if (size < sizeof(uint32_t) * 2) {
+        file.close();
         throw std::runtime_error("Invalid file format");
-
-    Serializable::Read(file, version);
-    if (version > VERSION)
-        throw std::runtime_error("Unsupported file version");
-
-    Serializable::Read(file, m_Flags);
-
-    uint32_t checksum;
-    Serializable::Read(file, checksum);
-
-    size_t compressedSize;
-    Serializable::Read(file, compressedSize);
-
-    std::vector<uint8_t> compressedData(compressedSize);
-    Serializable::ReadBytes(file, compressedData.data(), compressedSize);
-    file.close();
-
-    uint32_t checksumInFile = crc32(0, compressedData.data(), compressedData.size());
-    if (checksum != checksumInFile) {
-        throw std::runtime_error("Checksum mismatch");
     }
 
-    std::vector<uint8_t> decompressedData;
-    if (!DecompressData(compressedData, decompressedData)) {
-        throw std::runtime_error("Failed to decompress data");
-    }
-    compressedData.clear();
-
-    VectorInputStream memStream(decompressedData);
-
-    Serializable::ReadString(memStream, m_MapName);
-
-    size_t frameCount;
-    Serializable::Read(memStream, frameCount);
-
-    m_Frames.resize(frameCount);
-    for (auto &frame : m_Frames) {
-        if (!frame.Deserialize(memStream)) {
-            throw std::runtime_error("Failed to deserialize a frame");
+    if (!m_Legacy) {
+        uint32_t magic, version;
+        Serializable::Read(file, magic);
+        if (magic != MAGIC_NUMBER) {
+            file.close();
+            throw std::runtime_error("Unknown file magic number");
         }
-    }
 
-    size_t sectorCount;
-    Serializable::Read(memStream, sectorCount);
+        Serializable::Read(file, version);
+        if (version > VERSION) {
+            file.close();
+            throw std::runtime_error("Unsupported file version");
+        }
 
-    m_Sectors.resize(sectorCount);
-    for (auto &sector : m_Sectors) {
-        if (!sector.Deserialize(memStream)) {
-            throw std::runtime_error("Failed to deserialize a sector");
+        Serializable::Read(file, m_Flags);
+
+        uint32_t checksum;
+        Serializable::Read(file, checksum);
+
+        size_t compressedSize;
+        Serializable::Read(file, compressedSize);
+
+        std::vector<uint8_t> compressedData(compressedSize);
+        Serializable::ReadBytes(file, compressedData.data(), compressedSize);
+        file.close();
+
+        uint32_t checksumInFile = crc32(0, compressedData.data(), compressedData.size());
+        if (checksum != checksumInFile) {
+            throw std::runtime_error("Checksum mismatch");
+        }
+
+        std::vector<uint8_t> decompressedData;
+        if (!DecompressData(compressedData, decompressedData)) {
+            throw std::runtime_error("Failed to decompress data");
+        }
+        compressedData.clear();
+
+        VectorInputStream memStream(decompressedData);
+
+        Serializable::ReadString(memStream, m_MapName);
+
+        size_t frameCount;
+        Serializable::Read(memStream, frameCount);
+
+        m_Frames.resize(frameCount);
+        for (auto &frame : m_Frames) {
+            if (!frame.Deserialize(memStream)) {
+                throw std::runtime_error("Failed to deserialize a frame");
+            }
+        }
+
+        size_t sectorCount;
+        Serializable::Read(memStream, sectorCount);
+
+        m_Sectors.resize(sectorCount);
+        for (auto &sector : m_Sectors) {
+            if (!sector.Deserialize(memStream)) {
+                throw std::runtime_error("Failed to deserialize a sector");
+            }
+        }
+    } else {
+        uint32_t decompressedSize;
+        Serializable::Read(file, decompressedSize);
+        std::vector<uint8_t> compressedData(size - sizeof(size_t));
+        Serializable::ReadBytes(file, compressedData.data(), size - sizeof(size_t));
+        file.close();
+
+        std::vector<uint8_t> decompressedData;
+        if (!DecompressData(compressedData, decompressedData)) {
+            throw std::runtime_error("Failed to decompress data");
+        }
+        compressedData.clear();
+
+        if (decompressedSize != decompressedData.size()) {
+            throw std::runtime_error("Decompressed size mismatch");
+        }
+
+        VectorInputStream memStream(decompressedData);
+
+        size_t frameCount = decompressedData.size() / (sizeof(float) + sizeof(uint32_t));
+        m_Frames.resize(frameCount);
+        for (auto &frame : m_Frames) {
+            if (!frame.Deserialize(memStream)) {
+                throw std::runtime_error("Failed to deserialize a frame");
+            }
         }
     }
 
@@ -447,45 +488,68 @@ void TASRecord::Save() const {
     std::vector<uint8_t> data;
     VectorOutputStream memStream(data);
 
-    Serializable::WriteString(memStream, m_MapName);
+    if (!m_Legacy) {
+        Serializable::WriteString(memStream, m_MapName);
 
-    size_t frameCount = m_Frames.size();
-    Serializable::Write(memStream, frameCount);
+        size_t frameCount = m_Frames.size();
+        Serializable::Write(memStream, frameCount);
 
-    for (const auto &frame : m_Frames) {
-        if (!frame.Serialize(memStream)) {
-            throw std::runtime_error("Failed to serialize a frame");
+        for (const auto &frame : m_Frames) {
+            if (!frame.Serialize(memStream)) {
+                throw std::runtime_error("Failed to serialize a frame");
+            }
         }
-    }
 
-    size_t sectorCount = m_Sectors.size();
-    Serializable::Write(memStream, sectorCount);
+        size_t sectorCount = m_Sectors.size();
+        Serializable::Write(memStream, sectorCount);
 
-    for (const auto &sector : m_Sectors) {
-        if (!sector.Serialize(memStream)) {
-            throw std::runtime_error("Failed to serialize a sector");
+        for (const auto &sector : m_Sectors) {
+            if (!sector.Serialize(memStream)) {
+                throw std::runtime_error("Failed to serialize a sector");
+            }
         }
+
+        std::vector<uint8_t> compressedData;
+        if (!CompressData(data, compressedData)) {
+            throw std::runtime_error("Failed to compress data");
+        }
+
+        std::ofstream file(m_Path, std::ios::binary);
+        if (!file.is_open())
+            throw std::runtime_error("Failed to open file for writing");
+
+        Serializable::Write(file, MAGIC_NUMBER);
+        Serializable::Write(file, VERSION);
+        Serializable::Write(file, m_Flags);
+
+        uint32_t checksum = crc32(0, compressedData.data(), compressedData.size());
+        Serializable::Write(file, checksum);
+
+        size_t compressedSize = compressedData.size();
+        Serializable::Write(file, compressedSize);
+        Serializable::WriteBytes(file, compressedData.data(), compressedSize);
+
+        file.close();
+    } else {
+        for (const auto &frame : m_Frames) {
+            if (!frame.Serialize(memStream)) {
+                throw std::runtime_error("Failed to serialize a frame");
+            }
+        }
+
+        std::vector<uint8_t> compressedData;
+        if (!CompressData(data, compressedData)) {
+            throw std::runtime_error("Failed to compress data");
+        }
+
+        std::ofstream file(m_Path, std::ios::binary);
+        if (!file.is_open())
+            throw std::runtime_error("Failed to open file for writing");
+
+        size_t compressedSize = compressedData.size();
+        Serializable::Write(file, compressedSize);
+        Serializable::WriteBytes(file, compressedData.data(), compressedSize);
+
+        file.close();
     }
-
-    std::vector<uint8_t> compressedData;
-    if (!CompressData(data, compressedData)) {
-        throw std::runtime_error("Failed to compress data");
-    }
-
-    std::ofstream file(m_Path, std::ios::binary);
-    if (!file.is_open())
-        throw std::runtime_error("Failed to open file for writing");
-
-    Serializable::Write(file, MAGIC_NUMBER);
-    Serializable::Write(file, VERSION);
-    Serializable::Write(file, m_Flags);
-
-    uint32_t checksum = crc32(0, compressedData.data(), compressedData.size());
-    Serializable::Write(file, checksum);
-
-    size_t compressedSize = compressedData.size();
-    Serializable::Write(file, compressedSize);
-    Serializable::WriteBytes(file, compressedData.data(), compressedSize);
-
-    file.close();
 }

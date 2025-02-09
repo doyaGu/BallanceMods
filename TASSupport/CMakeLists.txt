@@ -8,6 +8,7 @@ add_subdirectory(miniz EXCLUDE_FROM_ALL)
 add_bml_mod(TASSupport
         TASSupport.cpp TASSupport.h
         TASRecord.cpp TASRecord.h
+        TASHook.cpp TASHook.h
         physics_RT.cpp physics_RT.h
 )
 

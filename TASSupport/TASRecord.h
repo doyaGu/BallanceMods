@@ -201,33 +201,6 @@ struct PhysicsFrame : Serializable {
     bool Deserialize(std::istream &in) override;
 };
 
-// struct Entity : Serializable {
-//     std::string name;
-//     std::string type;
-//     VxVector position;
-//     uint32_t flags = 0;
-//
-//     bool Serialize(std::ostream &out) const override;
-//     bool Deserialize(std::istream &in) override;
-// };
-
-//
-// struct Trafo : Entity {
-//
-// };
-//
-// struct Modul : Entity {
-//
-// };
-//
-// struct ExtraLife : Entity {
-//
-// };
-//
-// struct ExtraPoint : Entity {
-//
-// };
-
 struct Sector : Serializable {
     int id = 0;
     int frameStart = 0;
@@ -269,7 +242,8 @@ struct GameFrame : Serializable {
 class TASRecord {
 public:
     TASRecord() = default;
-    TASRecord(std::string name, std::string path) : m_Name(std::move(name)), m_Path(std::move(path)) {}
+    TASRecord(std::string name, std::string path, bool legacy = false)
+        : m_Name(std::move(name)), m_Path(std::move(path)), m_Legacy(legacy) {}
 
     bool operator==(const TASRecord &rhs) const { return m_Name == rhs.m_Name; }
     bool operator!=(const TASRecord &rhs) const { return !(rhs == *this); }
@@ -288,6 +262,7 @@ public:
     [[nodiscard]] const std::string &GetMapName() const { return m_MapName; }
     void SetMapName(const std::string &name) { m_MapName = name; }
 
+    [[nodiscard]] bool IsLegacy() const { return m_Legacy; }
     [[nodiscard]] bool IsLoaded() const { return m_Loaded; }
     void Load();
     void Save() const;
@@ -341,6 +316,7 @@ private:
     std::string m_Name;
     std::string m_Path;
     std::string m_MapName;
+    bool m_Legacy = false;
     bool m_Loaded = false;
     size_t m_FrameIndex = 0;
     std::vector<GameFrame> m_Frames;
