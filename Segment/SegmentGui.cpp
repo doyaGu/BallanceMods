@@ -14,9 +14,9 @@ void SegmentGui::update() {
         ImGui::PushFont(ImGui::GetFont());
     }
 
-	constexpr auto WinFlags = ImGuiWindowFlags_NoTitleBar |
-		                   ImGuiWindowFlags_NoResize |
-                           ImGuiWindowFlags_AlwaysAutoResize |
+    constexpr auto WinFlags = ImGuiWindowFlags_NoTitleBar |
+                           ImGuiWindowFlags_NoResize |
+                           ImGuiWindowFlags_NoScrollbar |
                            ImGuiWindowFlags_NoFocusOnAppearing |
                            ImGuiWindowFlags_NoBringToFrontOnFocus | 
                            ImGuiWindowFlags_NoNav;
