@@ -69,19 +69,33 @@ void Segment::OnLoadObject(const char *filename, CKBOOL isMap, const char *maste
 void Segment::OnPreExitLevel() {
     session_->gui.set_cursor_visible(false);
     session_->state.enable_counting(false);
-    session_->state.update_target_figures();
+    if (!cheat_enabled_once_)
+        session_->state.update_target_figures();
     save_pico_to_file(serialize_sessions_to_pico());
+    cheat_enabled_once_ = false;
 }
 
 void Segment::OnGameOver() {
     session_->state.enable_counting(false);
 }
 
+void Segment::OnCheatEnabled(bool enable) {
+    if (enable) {
+        cheat_enabled_once_ = true;
+        m_BML->SendIngameMessage("Cheat mode enabled. Segment will stop recording.");
+        m_BML->SendIngameMessage("Disable cheat mode to restore.");
+    } else {
+        m_BML->SendIngameMessage("Cheat mode disabled. Segment will now start recording.");
+    }
+}
+
 void Segment::OnPreEndLevel() {
     session_->state.enable_counting(false);
     session_->state.change_segment(get_current_sector() + 1);
-    session_->state.update_target_figures();
+    if (!cheat_enabled_once_)
+        session_->state.update_target_figures();
     save_pico_to_file(serialize_sessions_to_pico());
+    cheat_enabled_once_ = false;
 }
 
 void Segment::OnCounterActive() {
@@ -110,6 +124,7 @@ void Segment::OnProcess() {
 }
 
 void Segment::OnStartLevel() {
+    cheat_enabled_once_ = m_BML->IsCheatEnabled();
     session_->state.reset();
     session_->gui.set_cursor_visible(true);
 }
@@ -117,8 +132,10 @@ void Segment::OnStartLevel() {
 void Segment::OnPreResetLevel() {
     session_->gui.set_cursor_visible(false);
     session_->state.enable_counting(false);
-    session_->state.update_target_figures();
+    if (!cheat_enabled_once_)
+        session_->state.update_target_figures();
     save_pico_to_file(serialize_sessions_to_pico());
+    cheat_enabled_once_ = false;
 }
 
 void Segment::OnPostCheckpointReached() {
@@ -161,8 +178,7 @@ picojson::value Segment::serialize_sessions_to_pico(serialize_from_t serialize_f
 void Segment::save_pico_to_file(const picojson::value &v) {
     //std::string path = (std::filesystem::current_path() / RECORD_SAVE_PATH).lexically_normal().string();
     std::ofstream fs(RECORD_SAVE_PATH, std::ios::trunc);
-    std::string str = v.serialize();
-    fs << str;
+    fs << v.serialize();
     fs.close();
 }
 
@@ -196,9 +212,7 @@ bool Segment::load_sessions_from_file() {
         }
         picojson::object map_obj = record.get<picojson::object>();
 
-        for (picojson::value::object::const_iterator i = map_obj.begin();
-             i != map_obj.end();
-             ++i) {
+        for (picojson::value::object::const_iterator i = map_obj.begin(); i != map_obj.end(); ++i) {
             if (!i->second.is<picojson::object>()) {
                 GetLogger()->Error("Level object in illegal form.");
 
@@ -225,8 +239,8 @@ bool Segment::load_sessions_from_file() {
 
             sessions_[i->first] = std::make_shared<session>(name, arr.size());
             auto &state = sessions_[i->first]->state;
-            for (size_t i = 0; i < state.size(); ++i) {
-                state.segment_target(i) = static_cast<float>(arr[i].get<double>());
+            for (size_t j = 0; j < state.size(); ++j) {
+                state.segment_target(j) = static_cast<float>(arr[j].get<double>());
             }
         }
     }

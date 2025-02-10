@@ -48,6 +48,7 @@ public:
                               XObjectArray *objArray, CKObject *masterObj) override;
     void OnPreExitLevel() override;
     void OnGameOver() override;
+    void OnCheatEnabled(bool enable) override;
 
     void ClearHistory() const {
         if (session_)
@@ -82,6 +83,7 @@ private:
 
     std::unordered_map<std::string, std::shared_ptr<session>> sessions_;
     std::shared_ptr<session> session_;
+    bool cheat_enabled_once_ = false;
 
     IProperty *font_scale_ = nullptr;
     IProperty *show_settings_ = nullptr;
