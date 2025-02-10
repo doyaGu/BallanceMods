@@ -27,8 +27,7 @@ public:
             return;
         //std::copy(segment_time_.begin(), segment_time_.begin() + current_segment_, segment_time_to_compare_.begin());
         for (int i = 0; i < current_segment_; ++i) {
-            if (segment_time_[i] > 0 && (segment_time_[i] < segment_time_to_compare_[i] || segment_time_to_compare_[i] <
-                                         0))
+            if (segment_time_[i] > 0 && (segment_time_[i] < segment_time_to_compare_[i] || segment_time_to_compare_[i] < 0))
                 segment_time_to_compare_[i] = segment_time_[i];
         }
     }
@@ -49,7 +48,7 @@ public:
     }
 
     void change_segment(const int seg) {
-        if (0 < seg && seg < (int) size())
+        if (0 < seg && seg < static_cast<int>(size()))
             reset_segment(seg);
         else
             enable_counting(false);
