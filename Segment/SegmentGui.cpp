@@ -15,7 +15,7 @@ void SegmentGui::update() {
     }
 
     constexpr auto WinFlags = ImGuiWindowFlags_NoTitleBar |
-                           ImGuiWindowFlags_NoResize |
+                           ImGuiWindowFlags_AlwaysAutoResize|
                            ImGuiWindowFlags_NoScrollbar |
                            ImGuiWindowFlags_NoFocusOnAppearing |
                            ImGuiWindowFlags_NoBringToFrontOnFocus | 
