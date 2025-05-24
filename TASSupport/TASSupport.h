@@ -91,7 +91,6 @@ public:
 
     CK3dEntity *GetActiveBall() const;
 
-    CKDWORD m_PhysicsRTVersion = 0;
     CKIpionManager *m_IpionManager = nullptr;
     CKTimeManager *m_TimeManager = nullptr;
     InputHook *m_InputHook = nullptr;

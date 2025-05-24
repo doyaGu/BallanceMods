@@ -603,25 +603,7 @@ class CKIpionManager : public CKBaseManager {
 public:
     virtual void Reset() = 0;
 
-    virtual IPhysicsObject *GetPhysicsObject(CK3dEntity *entity) = 0;
-
-    virtual void ResetSimulationClock() = 0;
-
-    virtual double GetSimulationTime() const = 0;
-
-    virtual float GetSimulationTimeStep() const = 0;
-    virtual void SetSimulationTimeStep(float step) = 0;
-
-    virtual float GetDeltaTime() const = 0;
-    virtual void SetDeltaTime(float delta) = 0;
-
-    virtual float GetTimeFactor() const = 0;
-    virtual void SetTimeFactor(float factor) = 0;
-
-    virtual void GetGravity(VxVector &gravity) const = 0;
-    virtual void SetGravity(const VxVector &gravity) = 0;
-
-    PhysicsObject *GetPhysicsObject0(CK3dEntity *entity) {
+    PhysicsObject *GetPhysicsObject(CK3dEntity *entity) {
         if (!entity)
             return nullptr;
 

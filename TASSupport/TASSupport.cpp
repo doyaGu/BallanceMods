@@ -22,13 +22,6 @@ void BMLExit(IMod *mod) {
     delete mod;
 }
 
-static CKDWORD GetPhysicsRTVersion() {
-    CKPluginEntry *entry = CKGetPluginManager()->FindComponent(CKGUID(0x6BED328B, 0x141F5148));
-    if (entry)
-        return entry->m_PluginInfo.m_Version;
-    return 0;
-}
-
 void TASSupport::OnLoad() {
     GetConfig()->SetCategoryComment("Misc", "Miscellaneous");
 
@@ -83,10 +76,7 @@ void TASSupport::OnLoad() {
 
     VxMakeDirectory((CKSTRING) BML_TAS_PATH);
 
-    m_PhysicsRTVersion = GetPhysicsRTVersion();
-    if (m_PhysicsRTVersion == 0x000001) {
-        InitPhysicsMethodPointers();
-    }
+    InitPhysicsMethodPointers();
 
     m_IpionManager = (CKIpionManager *) m_BML->GetCKContext()->GetManagerByGuid(CKGUID(0x6bed328b, 0x141f5148));
     m_TimeManager = m_BML->GetTimeManager();
@@ -598,18 +588,10 @@ void TASSupport::OnDrawInfo() {
             VxVector position, angles;
             VxVector velocity, angularVelocity;
 
-            if (m_PhysicsRTVersion == 0x000001) {
-                auto *obj = m_IpionManager->GetPhysicsObject0(ball);
-                if (obj) {
-                    obj->GetPosition(&position, &angles);
-                    obj->GetVelocity(&velocity, &angularVelocity);
-                }
-            } else if (m_PhysicsRTVersion == 0x000002) {
-                auto *obj = m_IpionManager->GetPhysicsObject(ball);
-                if (obj) {
-                    obj->GetPosition(&position, &angles);
-                    obj->GetVelocity(&velocity, &angularVelocity);
-                }
+            auto *obj = m_IpionManager->GetPhysicsObject(ball);
+            if (obj) {
+                obj->GetPosition(&position, &angles);
+                obj->GetVelocity(&velocity, &angularVelocity);
             }
 
             ImGui::Text("Position:");
@@ -635,9 +617,7 @@ void TASSupport::InitHooks() {
     CKInputManagerHook::Enable(inputManager);
 
     if (!m_Legacy) {
-        if (m_PhysicsRTVersion == 0x000001) {
-            HookPhysicsRT();
-        }
+        HookPhysicsRT();
         HookRandom();
     }
 }
@@ -650,9 +630,7 @@ void TASSupport::ShutdownHooks() {
     CKInputManagerHook::Disable();
 
     if (!m_Legacy) {
-        if (m_PhysicsRTVersion == 0x000001) {
-            UnhookPhysicsRT();
-        }
+        UnhookPhysicsRT();
         UnhookRandom();
     }
 }
@@ -670,54 +648,45 @@ void TASSupport::AcquireKeyBindings() {
 
 void TASSupport::ResetPhysicsTime() {
     // Reset physics time in order to sync with TAS records
-    if (m_PhysicsRTVersion == 0x000001) {
-        // IVP_Environment
-        auto *env = *reinterpret_cast<CKBYTE **>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC0);
+    // IVP_Environment
+    auto *env = *reinterpret_cast<CKBYTE **>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC0);
 
-        auto &base_time = *reinterpret_cast<double *>(*reinterpret_cast<CKBYTE **>(env + 0x4) + 0x18);
+    auto &base_time = *reinterpret_cast<double *>(*reinterpret_cast<CKBYTE **>(env + 0x4) + 0x18);
 #ifdef _DEBUG
-        GetLogger()->Info("time_manager->base_time: %f", base_time);
+    GetLogger()->Info("time_manager->base_time: %f", base_time);
 #endif
-        base_time = 0;
+    base_time = 0;
 
-        auto &current_time = *reinterpret_cast<double *>(env + 0x120);
+    auto &current_time = *reinterpret_cast<double *>(env + 0x120);
 #ifdef _DEBUG
-        GetLogger()->Info("current_time: %f", current_time);
+    GetLogger()->Info("current_time: %f", current_time);
 #endif
-        current_time = 0;
+    current_time = 0;
 
-        auto &time_of_last_psi = *reinterpret_cast<double *>(env + 0x130);
+    auto &time_of_last_psi = *reinterpret_cast<double *>(env + 0x130);
 #ifdef _DEBUG
-        GetLogger()->Info("time_of_last_psi: %f", time_of_last_psi);
+    GetLogger()->Info("time_of_last_psi: %f", time_of_last_psi);
 #endif
-        time_of_last_psi = 0;
+    time_of_last_psi = 0;
 
-        auto &time_of_next_psi = *reinterpret_cast<double *>(env + 0x128);
+    auto &time_of_next_psi = *reinterpret_cast<double *>(env + 0x128);
 #ifdef _DEBUG
-        GetLogger()->Info("time_of_next_psi: %f", time_of_next_psi);
+    GetLogger()->Info("time_of_next_psi: %f", time_of_next_psi);
 #endif
-        time_of_next_psi = time_of_last_psi + 1.0 / 66;
+    time_of_next_psi = time_of_last_psi + 1.0 / 66;
 
-        // auto &current_time_code = *reinterpret_cast<double *>(env + 0x138);
-        // GetLogger()->Info("current_time_code: %f", current_time_code);
-        // current_time_code = 1;
+    // auto &current_time_code = *reinterpret_cast<double *>(env + 0x138);
+    // GetLogger()->Info("current_time_code: %f", current_time_code);
+    // current_time_code = 1;
 
-        auto &deltaTime = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC8);
-        deltaTime = m_TimeManager->GetLastDeltaTime();
-    } else if (m_PhysicsRTVersion == 0x000002) {
-        m_IpionManager->ResetSimulationClock();
-        m_IpionManager->SetDeltaTime(m_TimeManager->GetLastDeltaTime());
-    }
+    auto &deltaTime = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC8);
+    deltaTime = m_TimeManager->GetLastDeltaTime();
 }
 
 void TASSupport::SetPhysicsTimeFactor(float factor) {
     // Reset physics time factor in case it was changed
-    if (m_PhysicsRTVersion == 0x000001) {
-        auto &physicsTimeFactor = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xD0);
-        physicsTimeFactor = factor * 0.001f;
-    } else if (m_PhysicsRTVersion == 0x000002) {
-        m_IpionManager->SetTimeFactor(1);
-    }
+    auto &physicsTimeFactor = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xD0);
+    physicsTimeFactor = factor * 0.001f;
 }
 
 void TASSupport::SetNextMovementCheck(short count) {
