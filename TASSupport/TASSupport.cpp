@@ -635,7 +635,9 @@ void TASSupport::InitHooks() {
     CKInputManagerHook::Enable(inputManager);
 
     if (!m_Legacy) {
-        HookPhysicsRT();
+        if (m_PhysicsRTVersion == 0x000001) {
+            HookPhysicsRT();
+        }
         HookRandom();
     }
 }
@@ -648,7 +650,9 @@ void TASSupport::ShutdownHooks() {
     CKInputManagerHook::Disable();
 
     if (!m_Legacy) {
-        UnhookPhysicsRT();
+        if (m_PhysicsRTVersion == 0x000001) {
+            UnhookPhysicsRT();
+        }
         UnhookRandom();
     }
 }
