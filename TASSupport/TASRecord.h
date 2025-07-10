@@ -214,15 +214,15 @@ struct Sector : Serializable {
 };
 
 struct InputState : Serializable {
-    unsigned keyUp: 1 = 0;
-    unsigned keyDown: 1 = 0;
-    unsigned keyLeft: 1 = 0;
-    unsigned keyRight: 1 = 0;
-    unsigned keyShift: 1 = 0;
-    unsigned keySpace: 1 = 0;
-    unsigned keyQ: 1 = 0;
-    unsigned keyEsc: 1 = 0;
-    unsigned keyEnter: 1 = 0;
+    uint8_t keyUp = 0;
+    uint8_t keyDown = 0;
+    uint8_t keyLeft = 0;
+    uint8_t keyRight = 0;
+    uint8_t keyShift = 0;
+    uint8_t keySpace = 0;
+    uint8_t keyQ = 0;
+    uint8_t keyEsc = 0;
+    uint8_t keyEnter = 0;
 
     bool Serialize(std::ostream &out) const override;
     bool Deserialize(std::istream &in) override;

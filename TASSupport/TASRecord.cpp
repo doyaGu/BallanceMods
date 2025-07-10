@@ -317,27 +317,27 @@ bool Sector::Deserialize(std::istream &in) {
 }
 
 bool InputState::Serialize(std::ostream &out) const {
-    uint32_t keyStates = (keyUp << 0) | (keyDown << 1) | (keyLeft << 2) |
-                         (keyRight << 3) | (keyShift << 4) | (keySpace << 5) |
-                         (keyQ << 6) | (keyEsc << 7) | (keyEnter << 8);
-    return Write(out, keyStates);
+    return Write(out, keyUp) &&
+           Write(out, keyDown) &&
+           Write(out, keyLeft) &&
+           Write(out, keyRight) &&
+           Write(out, keyShift) &&
+           Write(out, keySpace) &&
+           Write(out, keyQ) &&
+           Write(out, keyEsc) &&
+           Write(out, keyEnter);
 }
 
 bool InputState::Deserialize(std::istream &in) {
-    uint32_t keyStates;
-    if (!Read(in, keyStates))
-        return false;
-
-    keyUp = (keyStates >> 0) & 1;
-    keyDown = (keyStates >> 1) & 1;
-    keyLeft = (keyStates >> 2) & 1;
-    keyRight = (keyStates >> 3) & 1;
-    keyShift = (keyStates >> 4) & 1;
-    keySpace = (keyStates >> 5) & 1;
-    keyQ = (keyStates >> 6) & 1;
-    keyEsc = (keyStates >> 7) & 1;
-    keyEnter = (keyStates >> 8) & 1;
-    return true;
+    return Read(in, keyUp) &&
+           Read(in, keyDown) &&
+           Read(in, keyLeft) &&
+           Read(in, keyRight) &&
+           Read(in, keyShift) &&
+           Read(in, keySpace) &&
+           Read(in, keyQ) &&
+           Read(in, keyEsc) &&
+           Read(in, keyEnter);
 }
 
 bool GameFrame::Serialize(std::ostream &out) const {
