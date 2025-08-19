@@ -329,24 +329,22 @@ void TASSupport::OnPhysicalize(CK3dEntity *target, CKBOOL fixed, float friction,
         ball->GetPosition(&position);
         GetLogger()->Info("Position: (%.3f, %.3f, %.3f)", position.x, position.y, position.z);
 
-        if (m_PhysicsRTVersion == 0x000001) {
-            auto *env = *reinterpret_cast<CKBYTE **>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC0);
+        auto *env = *reinterpret_cast<CKBYTE **>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC0);
 
-            auto &base_time = *reinterpret_cast<double *>(*reinterpret_cast<CKBYTE **>(env + 0x4) + 0x18);
-            GetLogger()->Info("time_manager->base_time: %f", base_time);
+        auto &base_time = *reinterpret_cast<double *>(*reinterpret_cast<CKBYTE **>(env + 0x4) + 0x18);
+        GetLogger()->Info("time_manager->base_time: %f", base_time);
 
-            auto &current_time = *reinterpret_cast<double *>(env + 0x120);
-            GetLogger()->Info("current_time: %f", current_time);
+        auto &current_time = *reinterpret_cast<double *>(env + 0x120);
+        GetLogger()->Info("current_time: %f", current_time);
 
-            auto &time_of_last_psi = *reinterpret_cast<double *>(env + 0x130);
-            GetLogger()->Info("time_of_last_psi: %f", time_of_last_psi);
+        auto &time_of_last_psi = *reinterpret_cast<double *>(env + 0x130);
+        GetLogger()->Info("time_of_last_psi: %f", time_of_last_psi);
 
-            auto &time_of_next_psi = *reinterpret_cast<double *>(env + 0x128);
-            GetLogger()->Info("time_of_next_psi: %f", time_of_next_psi);
+        auto &time_of_next_psi = *reinterpret_cast<double *>(env + 0x128);
+        GetLogger()->Info("time_of_next_psi: %f", time_of_next_psi);
 
-            auto &deltaTime = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC8);
-            GetLogger()->Info("LastDeltaTime: %f", deltaTime);
-        }
+        auto &deltaTime = *reinterpret_cast<float *>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC8);
+        GetLogger()->Info("LastDeltaTime: %f", deltaTime);
     }
 }
 #endif
