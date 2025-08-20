@@ -30,7 +30,6 @@ public:
     void OnProcess() override;
 
     void OnCheatEnabled(bool enable) override;
-    void OnPreCommandExecute(ICommand *command, const std::vector<std::string> &args) override;
 
     void OnStartLevel() override;
     void OnPreResetLevel() override;
@@ -67,6 +66,7 @@ private:
     CKRenderContext *m_RenderContext = nullptr;
     InputHook *m_InputHook = nullptr;
     float m_DeltaTime = 0.0f;
+    float m_SpeedTimes = 1.0f;
 
     bool m_InLevel = false;
     bool m_Paused = false;

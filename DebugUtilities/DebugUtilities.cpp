@@ -208,14 +208,11 @@ void DebugUtilities::OnCheatEnabled(bool enable) {
         SetParamValue(m_BallForce[0], m_BallCheat[0]->GetKey());
         SetParamValue(m_BallForce[1], m_BallCheat[1]->GetKey());
     } else {
+        if (abs(m_SpeedTimes - 1.0f) > EPSILON)
+            ChangeBallSpeed(1.0f);
+
         SetParamValue(m_BallForce[0], CKKEYBOARD(0));
         SetParamValue(m_BallForce[1], CKKEYBOARD(0));
-    }
-}
-
-void DebugUtilities::OnPreCommandExecute(ICommand *command, const std::vector<std::string> &args) {
-    if (args[0] == "cheat" && m_BML->IsCheatEnabled() && (args.size() == 1 || !ICommand::ParseBoolean(args[1]))) {
-        ChangeBallSpeed(1);
     }
 }
 
@@ -266,6 +263,11 @@ void DebugUtilities::OnLevelFinish() {
 }
 
 void DebugUtilities::ChangeBallSpeed(float times) {
+    if (times < 0.1f) {
+        m_BML->SendIngameMessage("Invalid Ball Speed Change");
+        return;
+    }
+
     if (m_BML->IsIngame()) {
         bool notify = true;
 
@@ -311,6 +313,8 @@ void DebugUtilities::ChangeBallSpeed(float times) {
 
             if (notify && m_SpeedNotification->GetBoolean())
                 m_BML->SendIngameMessage(("Current Ball Speed Changed to " + std::to_string(times) + " times").c_str());
+
+            m_SpeedTimes = times;
         }
     }
 }
