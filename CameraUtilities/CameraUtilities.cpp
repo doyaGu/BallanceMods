@@ -63,7 +63,7 @@ void CameraUtilities::OnLoadObject(const char *filename, CKBOOL isMap, const cha
 void CameraUtilities::OnProcess() {
     m_DeltaTime = m_BML->GetTimeManager()->GetLastDeltaTime() / 10;
 
-    if (!(m_CamOn->GetBoolean() && m_BML->IsCheatEnabled() && m_BML->IsPlaying()))
+    if (!(m_CamOn->GetBoolean() && m_BML->IsPlaying()))
         return;
 
     VxVector vect;
