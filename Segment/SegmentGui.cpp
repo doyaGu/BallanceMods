@@ -8,10 +8,9 @@ void SegmentGui::update() {
 
     ImGui::PushStyleColor(ImGuiCol_WindowBg, bg_color);
 
-    const float oldScale = ImGui::GetFont()->Scale;
-    if (font_scale_ != 1.0f) {
-        ImGui::GetFont()->Scale *= font_scale_;
-        ImGui::PushFont(ImGui::GetFont());
+    const bool doScale = font_scale_ != 1.0f;
+    if (doScale) {
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * font_scale_);
     }
 
     constexpr auto WinFlags = ImGuiWindowFlags_NoTitleBar |
@@ -22,7 +21,7 @@ void SegmentGui::update() {
                            ImGuiWindowFlags_NoNav;
 
     ImGui::Begin("Segments", nullptr, WinFlags); {
-        ImGui::Text(current_level_name_.c_str());
+        ImGui::TextUnformatted(current_level_name_.c_str());
 
         if (ImGui::BeginTable("##Segments", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
             ImGui::TableSetupColumn("Sector", ImGuiTableColumnFlags_WidthStretch);
@@ -78,8 +77,7 @@ void SegmentGui::update() {
         ImGui::End();
     }
 
-    if (font_scale_ != 1.0f) {
-        ImGui::GetFont()->Scale = oldScale;
+    if (doScale) {
         ImGui::PopFont();
     }
     ImGui::PopStyleColor();
