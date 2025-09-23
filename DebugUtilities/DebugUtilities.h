@@ -14,7 +14,7 @@ public:
     explicit DebugUtilities(IBML *bml) : IMod(bml) {}
 
     const char *GetID() override { return "DebugUtilities"; }
-    const char *GetVersion() override { return BML_VERSION; }
+    const char *GetVersion() override { return "0.3.2"; }
     const char *GetName() override { return "Debug Utilities"; }
     const char *GetAuthor() override { return "Gamepiaynmo & Kakuty"; }
     const char *GetDescription() override { return "Ballance Debug Utilities."; }
