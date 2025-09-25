@@ -471,14 +471,11 @@ void TASSupport::OnDrawMenu() {
     ImGui::Begin(TitleText, nullptr, MenuWinFlags);
 
     {
-        float oldScale = ImGui::GetFont()->Scale;
-        ImGui::GetFont()->Scale *= 1.5f;
-        ImGui::PushFont(ImGui::GetFont());
+        ImGui::PushFont(nullptr, ImGui::GetStyle().FontSizeBase * 1.5f);
 
         const auto titleSize = ImGui::CalcTextSize(TitleText);
         ImGui::GetWindowDrawList()->AddText(ImVec2((vpSize.x - titleSize.x) / 2.0f, vpSize.y * 0.07f), IM_COL32_WHITE, TitleText);
 
-        ImGui::GetFont()->Scale = oldScale;
         ImGui::PopFont();
     }
 
@@ -486,7 +483,7 @@ void TASSupport::OnDrawMenu() {
     int maxPage = (recordCount % 13) == 0 ? recordCount / 13 : recordCount / 13 + 1;
 
     if (m_CurrentPage > 0) {
-        ImGui::SetCursorScreenPos(Bui::CoordToScreenPos(ImVec2(0.34f, 0.4f)));
+        ImGui::SetCursorScreenPos(Bui::CoordToPixel(ImVec2(0.34f, 0.4f)));
         if (Bui::LeftButton("TASPrevPage")) {
             --m_CurrentPage;
         }
@@ -504,7 +501,7 @@ void TASSupport::OnDrawMenu() {
     for (int i = 0; i < 13 && n + i < recordCount; ++i) {
         auto &record = m_Records[n + i];
 
-        ImGui::SetCursorScreenPos(Bui::CoordToScreenPos(ImVec2(0.4031f, 0.15f + (float) i * 0.06f)));
+        ImGui::SetCursorScreenPos(Bui::CoordToPixel(ImVec2(0.4031f, 0.15f + (float) i * 0.06f)));
         if (Bui::LevelButton(record.GetName().c_str(), &v)) {
             ExitTASMenu();
 
@@ -520,7 +517,7 @@ void TASSupport::OnDrawMenu() {
         }
     }
 
-    ImGui::SetCursorScreenPos(Bui::CoordToScreenPos(ImVec2(0.4031f, 0.85f)));
+    ImGui::SetCursorScreenPos(Bui::CoordToPixel(ImVec2(0.4031f, 0.85f)));
     if (Bui::BackButton("TASBack") || ImGui::IsKeyPressed(ImGuiKey_Escape)) {
         m_CurrentPage = 0;
         ExitTASMenu();
@@ -548,14 +545,14 @@ void TASSupport::OnDrawKeys() {
 
             InputState state = m_CurrentRecord->GetFrames().inputState;
 
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.56f, 0.76f)), Bui::BUTTON_SMALL, state.keyUp ? 1 : 2, "^");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.56f, 0.8f)), Bui::BUTTON_SMALL, state.keyDown ? 1 : 2, "v");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.48f, 0.8f)), Bui::BUTTON_SMALL, state.keyLeft ? 1 : 2, "<");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.64f, 0.8f)), Bui::BUTTON_SMALL, state.keyRight ? 1 : 2, ">");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.30f, 0.8f)), Bui::BUTTON_SMALL, state.keyShift ? 1 : 2, "Shift");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.38f, 0.8f)), Bui::BUTTON_SMALL, state.keySpace ? 1 : 2, "Space");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.38f, 0.76f)), Bui::BUTTON_SMALL, state.keyQ ? 1 : 2, "Q");
-            Bui::AddButtonImage(drawList, Bui::CoordToScreenPos(ImVec2(0.30f, 0.76f)), Bui::BUTTON_SMALL, state.keyEsc ? 1 : 2, "ESC");
+            Bui::AddButtonImage(drawList, Bui::CoordToPixel(ImVec2(0.56f, 0.76f)), Bui::BUTTON_SMALL, state.keyUp ? 1 : 2, "^");
+            Bui::AddButtonImage(drawList, Bui::CoordToPixel(ImVec2(0.56f, 0.8f)), Bui::BUTTON_SMALL, state.keyDown ? 1 : 2, "v");
+            Bui::AddButtonImage(drawList, Bui::CoordToPixel(ImVec2(0.48f, 0.8f)), Bui::BUTTON_SMALL, state.keyLeft ? 1 : 2, "<");
+            Bui::AddButtonImage(drawList, Bui::CoordToPixel(ImVec2(0.64f, 0.8f)), Bui::BUTTON_SMALL, state.keyRight ? 1 : 2, ">");
+            Bui::AddButtonImage(drawList, Bui::CoordToPixel(ImVec2(0.30f, 0.8f)), Bui::BUTTON_SMALL, state.keyShift ? 1 : 2, "Shift");
+            Bui::AddButtonImage(drawList, Bui::CoordToPixel(ImVec2(0.38f, 0.8f)), Bui::BUTTON_SMALL, state.keySpace ? 1 : 2, "Space");
+            Bui::AddButtonImage(drawList, Bui::CoordToPixel(ImVec2(0.38f, 0.76f)), Bui::BUTTON_SMALL, state.keyQ ? 1 : 2, "Q");
+            Bui::AddButtonImage(drawList, Bui::CoordToPixel(ImVec2(0.30f, 0.76f)), Bui::BUTTON_SMALL, state.keyEsc ? 1 : 2, "ESC");
 
             sprintf(m_FrameCountText, "#%d", m_CurrentRecord->GetFrameIndex());
             const auto textSize = ImGui::CalcTextSize(m_FrameCountText);
