@@ -684,15 +684,15 @@ void TASSupport::SetPhysicsTimeFactor(float factor) {
     physicsTimeFactor = factor * 0.001f;
 }
 
-void TASSupport::SetNextMovementCheck(short count) {
-    if (m_PhysicsRTVersion == 0x000001) {
-        auto *env = *reinterpret_cast<CKBYTE**>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC0);
-        if (env) {
-            auto &next_movement_check = *reinterpret_cast<short *>(env + 0x140);
-            next_movement_check = count;
-        }
-    }
-}
+// void TASSupport::SetNextMovementCheck(short count) {
+//     if (m_PhysicsRTVersion == 0x000001) {
+//         auto *env = *reinterpret_cast<CKBYTE**>(reinterpret_cast<CKBYTE *>(m_IpionManager) + 0xC0);
+//         if (env) {
+//             auto &next_movement_check = *reinterpret_cast<short *>(env + 0x140);
+//             next_movement_check = count;
+//         }
+//     }
+// }
 
 void TASSupport::SetupNewRecord() {
     char filename[MAX_PATH];
