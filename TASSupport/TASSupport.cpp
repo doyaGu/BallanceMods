@@ -71,7 +71,7 @@ void TASSupport::OnLoad() {
 
     m_LegacyMode = GetConfig()->GetProperty("Misc", "LegacyMode");
     m_LegacyMode->SetComment("Compatibility mode for older TAS records (Restart game to take effect)");
-    m_LegacyMode->SetDefaultBoolean(false);
+    m_LegacyMode->SetDefaultBoolean(true);
     m_Legacy = m_LegacyMode->GetBoolean();
 
     VxMakeDirectory((CKSTRING) BML_TAS_PATH);
