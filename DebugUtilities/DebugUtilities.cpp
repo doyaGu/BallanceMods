@@ -502,8 +502,7 @@ void DebugUtilities::OnProcess_ChangeBall() {
     static char trafoTypes[3][6] = {"paper", "wood", "stone"};
 
     for (int i = 0; i < 3; i++) {
-        if (m_InputHook->IsKeyPressed(m_ChangeBall[i]->GetKey()) &&
-            strcmp(GetParamString(m_CurTrafo), trafoTypes[i]) != 0) {
+        if (m_InputHook->IsKeyPressed(m_ChangeBall[i]->GetKey())) {
             CKMessageManager *mm = m_BML->GetMessageManager();
             CKMessageType ballDeactivate = mm->AddMessageType("BallNav deactivate");
 
